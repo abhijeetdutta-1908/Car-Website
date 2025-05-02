@@ -20,7 +20,9 @@ type AuthContextType = {
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  console.log("AuthProvider initializing...");
   const { toast } = useToast();
+  
   const {
     data: user,
     error,

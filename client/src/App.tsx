@@ -8,8 +8,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import DealerDashboard from "@/pages/dealer-dashboard";
 import SalesDashboard from "@/pages/sales-dashboard";
 import { ProtectedRoute } from "./lib/protected-route";
-import { AuthProvider } from "./hooks/use-auth";
-import { useAuth } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "./hooks/use-auth";
 
 function HomeRedirect() {
   const { user, isLoading } = useAuth();
