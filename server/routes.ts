@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "../db";
 import { customers, cars, insertCustomerSchema, insertCarSchema } from "../shared/schema";
-import { eq, desc, like, and, or } from "drizzle-orm";
+import { eq, desc, like, and, or, sql } from "drizzle-orm";
 
 // Middleware to check authentication
 const isAuthenticated = (req: Request, res: Response, next: Function) => {
@@ -50,18 +50,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/sales/dashboard", isAuthenticated, hasRole("sales"), async (req, res) => {
     try {
-      // Get counts from the database - use a simpler query approach
-      const result = await db.execute(sql`
-        SELECT COUNT(*) FROM customers WHERE sales_person_id = ${req.user!.id}
-      `);
-      
-      const customerCount = parseInt(result.rows[0]?.count || '0', 10);
-      
-      // For now, return some static data along with real customer count
+      // For now, return static data since we don't have actual sales data yet
       res.json({
         stats: {
           dailySales: 0,
-          leadsGenerated: customerCount,
+          leadsGenerated: 0,
           conversionRate: "0%"
         },
         message: `Welcome back, ${req.user?.username}! Here's your sales dashboard.`

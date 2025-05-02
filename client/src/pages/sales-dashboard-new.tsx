@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LineChart, UserRound, Percent, Car, ShoppingCart, ChevronRight, PlusCircle, BarChart3, CalendarClock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,18 @@ interface SalesDashboardData {
   };
   message: string;
 }
+
+// Customer form validation schema
+const customerFormSchema = z.object({
+  firstName: z.string().min(2, "First name must be at least 2 characters"),
+  lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  email: z.string().email("Must provide a valid email"),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type CustomerFormValues = z.infer<typeof customerFormSchema>;
 
 export default function SalesDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -263,46 +275,9 @@ function TargetProgress({
   );
 }
 
-import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { apiRequest } from "@/lib/queryClient";
-
-// Customer form validation schema
-const customerFormSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Must provide a valid email"),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-type CustomerFormValues = z.infer<typeof customerFormSchema>;
-
 function CustomersTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
+  const queryClientInstance = useQueryClient();
   
   // Fetch customers
   const { data: customers, isLoading } = useQuery({
@@ -316,8 +291,8 @@ function CustomersTab() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/dashboard"] });
+      queryClientInstance.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClientInstance.invalidateQueries({ queryKey: ["/api/sales/dashboard"] });
       setIsAddDialogOpen(false);
     },
     onError: (error) => {
@@ -347,9 +322,9 @@ function CustomersTab() {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : customers && customers.length > 0 ? (
+          ) : customers && Array.isArray(customers) && customers.length > 0 ? (
             <div className="divide-y">
-              {customers.map((customer) => (
+              {customers.map((customer: any) => (
                 <div key={customer.id} className="py-3 flex justify-between items-center">
                   <div>
                     <h4 className="font-medium">{customer.firstName} {customer.lastName}</h4>

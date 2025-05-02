@@ -6,7 +6,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import AdminDashboard from "@/pages/admin-dashboard";
 import DealerDashboard from "@/pages/dealer-dashboard";
-import SalesDashboard from "@/pages/sales-dashboard";
+import SalesDashboard from "@/pages/sales-dashboard-new";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
 
