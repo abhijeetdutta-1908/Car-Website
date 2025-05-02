@@ -270,17 +270,29 @@ export default function AuthPage() {
                 <div className="flex items-start space-x-2">
                   <Checkbox
                     id="terms"
-                    {...registerForm.register("terms")}
+                    checked={registerForm.watch("terms")}
+                    onCheckedChange={(checked) => {
+                      registerForm.setValue("terms", checked === true, { 
+                        shouldValidate: true 
+                      });
+                    }}
                   />
                   <div className="grid gap-1.5 leading-none">
                     <Label
                       htmlFor="terms"
                       className="text-sm text-gray-600"
+                      onClick={() => {
+                        const currentValue = registerForm.getValues("terms");
+                        registerForm.setValue("terms", !currentValue, { 
+                          shouldValidate: true 
+                        });
+                      }}
                     >
                       I agree to the{" "}
                       <a
                         href="#"
                         className="text-primary-600 hover:text-primary-500"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Terms and Conditions
                       </a>
