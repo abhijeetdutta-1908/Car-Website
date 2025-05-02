@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +9,25 @@ import DealerDashboard from "@/pages/dealer-dashboard";
 import SalesDashboard from "@/pages/sales-dashboard";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
+
+function HomeRedirect() {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+  
+  if (user) {
+    return <Redirect to={`/${user.role}`} />;
+  }
+  
+  return <Redirect to="/auth" />;
+}
 
 function Router() {
   return (
@@ -29,13 +48,7 @@ function Router() {
         allowedRoles={["sales"]} 
       />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/" component={() => {
-        return (
-          <div className="flex items-center justify-center min-h-screen">
-            <p>Redirecting to dashboard...</p>
-          </div>
-        );
-      }} />
+      <Route path="/" component={HomeRedirect} />
       <Route component={NotFound} />
     </Switch>
   );
