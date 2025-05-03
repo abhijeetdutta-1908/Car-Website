@@ -2,7 +2,16 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "../db";
-import { customers, cars, insertCustomerSchema, insertCarSchema } from "../shared/schema";
+import { 
+  customers, 
+  cars, 
+  orders, 
+  salesTargets, 
+  insertCustomerSchema, 
+  insertCarSchema, 
+  insertOrderSchema,
+  insertSalesTargetSchema
+} from "../shared/schema";
 import { eq, desc, like, and, or, sql } from "drizzle-orm";
 
 // Middleware to check authentication
@@ -50,12 +59,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/sales/dashboard", isAuthenticated, hasRole("sales"), async (req, res) => {
     try {
-      // For now, return static data since we don't have actual sales data yet
+      const salesPersonId = req.user?.id;
+
+      // Get current date info for monthly calculations
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+      
+      // Get current day start and end for daily calculations
+      const startOfToday = new Date(now.setHours(0, 0, 0, 0));
+      const endOfToday = new Date(now.setHours(23, 59, 59, 999));
+
+      // Create orders table if it doesn't exist
+      await db.execute(
+        `CREATE TABLE IF NOT EXISTS "orders" (
+          "id" serial PRIMARY KEY NOT NULL,
+          "customer_id" integer NOT NULL REFERENCES "customers"("id"),
+          "car_id" integer NOT NULL REFERENCES "cars"("id"),
+          "sales_person_id" integer NOT NULL REFERENCES "users"("id"),
+          "order_date" timestamp DEFAULT now() NOT NULL,
+          "status" text DEFAULT 'pending' NOT NULL,
+          "total_amount" numeric(10, 2) NOT NULL,
+          "notes" text,
+          "created_at" timestamp DEFAULT now() NOT NULL,
+          "updated_at" timestamp DEFAULT now() NOT NULL
+        )`
+      );
+
+      // Calculate daily sales (total sales for today)
+      const dailySalesResult = await db.execute(
+        `SELECT COUNT(*) FROM orders 
+         WHERE sales_person_id = $1 
+         AND order_date >= $2 
+         AND order_date <= $3`,
+        [salesPersonId, startOfToday, endOfToday]
+      );
+      const dailySales = parseInt(dailySalesResult.rows[0]?.count || '0', 10);
+
+      // Calculate monthly sales for target progress
+      const monthlyCarsSoldResult = await db.execute(
+        `SELECT COUNT(*) FROM orders 
+         WHERE sales_person_id = $1 
+         AND order_date >= $2 
+         AND order_date <= $3`,
+        [salesPersonId, firstDayOfMonth, lastDayOfMonth]
+      );
+      const monthlyCarsSold = parseInt(monthlyCarsSoldResult.rows[0]?.count || '0', 10);
+
+      // Get total revenue for the month
+      const monthlyRevenueResult = await db.execute(
+        `SELECT COALESCE(SUM(total_amount), 0) as total FROM orders 
+         WHERE sales_person_id = $1 
+         AND order_date >= $2 
+         AND order_date <= $3`,
+        [salesPersonId, firstDayOfMonth, lastDayOfMonth]
+      );
+      const monthlyRevenue = parseFloat(monthlyRevenueResult.rows[0]?.total || '0');
+
+      // Count new leads (customers created this month)
+      const leadsResult = await db.execute(
+        `SELECT COUNT(*) FROM customers 
+         WHERE sales_person_id = $1 
+         AND created_at >= $2 
+         AND created_at <= $3`,
+        [salesPersonId, firstDayOfMonth, lastDayOfMonth]
+      );
+      const leadsGenerated = parseInt(leadsResult.rows[0]?.count || '0', 10);
+
+      // Calculate conversion rate (orders / leads)
+      let conversionRate = "0%";
+      if (leadsGenerated > 0) {
+        const rate = (monthlyCarsSold / leadsGenerated) * 100;
+        conversionRate = `${Math.round(rate)}%`;
+      }
+
+      // Create sales_targets table if it doesn't exist
+      await db.execute(
+        `CREATE TABLE IF NOT EXISTS "sales_targets" (
+          "id" serial PRIMARY KEY NOT NULL,
+          "sales_person_id" integer NOT NULL REFERENCES "users"("id"),
+          "target_month" date NOT NULL,
+          "revenue_target" numeric(10, 2) NOT NULL,
+          "units_target" integer NOT NULL,
+          "created_at" timestamp DEFAULT now() NOT NULL,
+          "updated_at" timestamp DEFAULT now() NOT NULL
+        )`
+      );
+
+      // Get or create sales target for the month
+      const targetMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+      const targetResult = await db.execute(
+        `SELECT * FROM sales_targets 
+         WHERE sales_person_id = $1 
+         AND target_month = $2`,
+        [salesPersonId, targetMonth]
+      );
+      
+      let revenueTarget = 100000;
+      let unitsTarget = 10;
+      
+      if (targetResult.rows.length === 0) {
+        // Create default sales target if none exists
+        await db.execute(
+          `INSERT INTO sales_targets 
+           (sales_person_id, target_month, revenue_target, units_target) 
+           VALUES ($1, $2, $3, $4)`,
+          [salesPersonId, targetMonth, revenueTarget, unitsTarget]
+        );
+      } else {
+        // Use existing target
+        revenueTarget = parseFloat(targetResult.rows[0].revenue_target);
+        unitsTarget = parseInt(targetResult.rows[0].units_target, 10);
+      }
+
       res.json({
         stats: {
-          dailySales: 0,
-          leadsGenerated: 0,
-          conversionRate: "0%"
+          dailySales,
+          leadsGenerated,
+          conversionRate,
+          monthlyCarsSold,
+          monthlyRevenue,
+          revenueTarget,
+          unitsTarget
         },
         message: `Welcome back, ${req.user?.username}! Here's your sales dashboard.`
       });
