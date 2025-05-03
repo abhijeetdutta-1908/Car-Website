@@ -15,6 +15,13 @@
       "when": 1746187237194,
       "tag": "0001_stale_blink",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1746254724862,
+      "tag": "0002_safe_lady_bullseye",
+      "breakpoints": true
     }
   ]
 }
