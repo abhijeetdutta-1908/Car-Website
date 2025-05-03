@@ -67,7 +67,6 @@ export const cars = pgTable("cars", {
   status: text("status").default('in_stock').notNull(),
   features: text("features"),
   imageUrl: text("image_url"),
-  restockDate: date("restock_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -186,7 +185,6 @@ export const insertCarSchema = createInsertSchema(cars)
     status: z.enum(['in_stock', 'out_of_stock', 'reserved', 'sold']).optional(),
     features: z.string().optional(),
     imageUrl: z.string().optional(),
-    restockDate: z.string().optional().or(z.date().optional()),
   })
   .omit({
     id: true,

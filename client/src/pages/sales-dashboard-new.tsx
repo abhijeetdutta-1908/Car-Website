@@ -699,9 +699,7 @@ function InventoryTab() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {car.status === 'out_of_stock' && car.restockDate ? 
-                        new Date(car.restockDate).toLocaleDateString() : 
-                        car.status === 'out_of_stock' ? 'Unknown' : '—'}
+                      {car.status === 'out_of_stock' ? 'Unknown' : '—'}
                     </TableCell>
                     <TableCell>
                       {car.status === 'in_stock' && (
