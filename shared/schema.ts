@@ -67,6 +67,8 @@ export const cars = pgTable("cars", {
   status: text("status").default('in_stock').notNull(),
   features: text("features"),
   imageUrl: text("image_url"),
+  restockDate: date("restock_date"),
+  quantity: integer("quantity").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -185,6 +187,8 @@ export const insertCarSchema = createInsertSchema(cars)
     status: z.enum(['in_stock', 'out_of_stock', 'reserved', 'sold']).optional(),
     features: z.string().optional(),
     imageUrl: z.string().optional(),
+    restockDate: z.date().optional(),
+    quantity: z.number().int().min(0, "Quantity must be a positive integer").default(1),
   })
   .omit({
     id: true,

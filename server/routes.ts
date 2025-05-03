@@ -46,15 +46,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  app.get("/api/dealer/dashboard", isAuthenticated, hasRole("dealer"), (req, res) => {
-    res.json({
-      stats: {
-        inventory: 157,
-        pendingOrders: 24,
-        monthlyRevenue: "$126,350"
-      },
-      message: "Welcome to the Dealer Dashboard"
-    });
+  app.get("/api/dealer/dashboard", isAuthenticated, hasRole("dealer"), async (req, res) => {
+    try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      const dealerId = req.user.id;
+      
+      // Get inventory count
+      const carsResult = await db.select({ count: sql<number>`count(*)` })
+        .from(cars);
+      const inventory = carsResult[0].count || 0;
+      
+      // Get pending orders count
+      const ordersResult = await db.select({ count: sql<number>`count(*)` })
+        .from(orders)
+        .where(eq(orders.status, 'pending'));
+      const pendingOrders = ordersResult[0].count || 0;
+      
+      // Get monthly revenue from sales staff
+      const currentDate = new Date();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      
+      // Get all sales staff for this dealer
+      const salesStaff = await db.select({ id: users.id })
+        .from(users)
+        .where(and(
+          eq(users.role, "sales"),
+          eq(users.dealerId, dealerId)
+        ));
+      
+      const salesStaffIds = salesStaff.map(staff => staff.id);
+      
+      let monthlyRevenue = 0;
+      if (salesStaffIds.length > 0) {
+        const revenueResult = await db.select({
+          totalRevenue: sql<string>`sum(${orders.totalAmount})`
+        })
+        .from(orders)
+        .where(and(
+          inArray(orders.salesPersonId, salesStaffIds),
+          gte(orders.orderDate, firstDayOfMonth),
+          lte(orders.orderDate, lastDayOfMonth)
+        ));
+        
+        monthlyRevenue = parseFloat(revenueResult[0].totalRevenue || '0');
+      }
+      
+      // Count sales staff
+      const salesStaffCount = salesStaff.length;
+      
+      res.json({
+        stats: {
+          inventory,
+          pendingOrders,
+          monthlyRevenue: `$${monthlyRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          salesStaffCount,
+          maxSalesStaff: 5
+        },
+        message: `Welcome back, ${req.user.username}! Here's your dealer dashboard.`
+      });
+    } catch (error) {
+      console.error("Error fetching dealer dashboard data:", error);
+      res.status(500).json({ message: "Error fetching dashboard data" });
+    }
   });
   
   app.get("/api/sales/dashboard", isAuthenticated, hasRole("sales"), async (req, res) => {
@@ -518,6 +575,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error updating order:", error);
       res.status(400).json({ 
         message: "Error updating order", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // === DEALER API ENDPOINTS ===
+  
+  // Get all sales staff for a dealer
+  app.get("/api/dealer/sales-staff", isAuthenticated, hasRole("dealer"), async (req, res) => {
+    try {
+      const dealerId = req.user!.id;
+      
+      const salesStaff = await db.select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        profilePicture: users.profilePicture,
+        phoneNumber: users.phoneNumber,
+        createdAt: users.createdAt
+      })
+      .from(users)
+      .where(and(
+        eq(users.role, "sales"),
+        eq(users.dealerId, dealerId)
+      ))
+      .orderBy(desc(users.createdAt));
+      
+      res.json(salesStaff);
+    } catch (error) {
+      console.error("Error fetching sales staff:", error);
+      res.status(500).json({ message: "Error fetching sales staff" });
+    }
+  });
+  
+  // Add a sales person to a dealer
+  app.post("/api/dealer/sales-staff", isAuthenticated, hasRole("dealer"), async (req, res) => {
+    try {
+      const dealerId = req.user!.id;
+      
+      // Check if dealer already has 5 sales persons
+      const existingSalesStaff = await db.select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(and(
+          eq(users.role, "sales"),
+          eq(users.dealerId, dealerId)
+        ));
+      
+      if (existingSalesStaff[0].count >= 5) {
+        return res.status(400).json({ 
+          message: "Cannot add more sales staff. Maximum of 5 sales persons per dealer allowed." 
+        });
+      }
+      
+      // Validate the request body
+      const userData = insertUserSchema.parse({
+        ...req.body,
+        role: "sales",
+        dealerId: dealerId
+      });
+      
+      // Create the user
+      const [newUser] = await db.insert(users).values(userData).returning({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        role: users.role,
+        createdAt: users.createdAt
+      });
+      
+      res.status(201).json(newUser);
+    } catch (error) {
+      console.error("Error adding sales person:", error);
+      res.status(400).json({ 
+        message: "Error adding sales person", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Remove a sales person
+  app.delete("/api/dealer/sales-staff/:id", isAuthenticated, hasRole("dealer"), async (req, res) => {
+    try {
+      const salesPersonId = parseInt(req.params.id);
+      const dealerId = req.user!.id;
+      
+      // Check if the sales person exists and belongs to this dealer
+      const salesPerson = await db.select()
+        .from(users)
+        .where(and(
+          eq(users.id, salesPersonId),
+          eq(users.role, "sales"),
+          eq(users.dealerId, dealerId)
+        ))
+        .limit(1);
+      
+      if (salesPerson.length === 0) {
+        return res.status(404).json({ message: "Sales person not found" });
+      }
+      
+      // Delete the sales person
+      await db.delete(users)
+        .where(eq(users.id, salesPersonId));
+      
+      res.status(200).json({ message: "Sales person removed successfully" });
+    } catch (error) {
+      console.error("Error removing sales person:", error);
+      res.status(500).json({ message: "Error removing sales person" });
+    }
+  });
+  
+  // Get sales performance data
+  app.get("/api/dealer/performance", isAuthenticated, hasRole("dealer"), async (req, res) => {
+    try {
+      const dealerId = req.user!.id;
+      
+      // Get all sales staff for this dealer
+      const salesStaff = await db.select({
+        id: users.id,
+        username: users.username
+      })
+      .from(users)
+      .where(and(
+        eq(users.role, "sales"),
+        eq(users.dealerId, dealerId)
+      ));
+      
+      const staffIds = salesStaff.map(s => s.id);
+      
+      // Get sales data for each staff member
+      const salesData = await Promise.all(staffIds.map(async (id) => {
+        // Get total sales
+        const totalSales = await db.select({
+          count: sql<number>`count(*)`,
+          revenue: sql<number>`sum(${orders.totalAmount})`,
+        })
+        .from(orders)
+        .where(eq(orders.salesPersonId, id));
+        
+        // Get current month targets
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
+        const targets = await db.select()
+          .from(salesTargets)
+          .where(and(
+            eq(salesTargets.salesPersonId, id),
+            gte(salesTargets.targetMonth, firstDayOfMonth),
+            lte(salesTargets.targetMonth, lastDayOfMonth)
+          ));
+        
+        // Get current month sales
+        const monthlySales = await db.select({
+          count: sql<number>`count(*)`,
+          revenue: sql<number>`sum(${orders.totalAmount})`,
+        })
+        .from(orders)
+        .where(and(
+          eq(orders.salesPersonId, id),
+          gte(orders.orderDate, firstDayOfMonth),
+          lte(orders.orderDate, lastDayOfMonth)
+        ));
+        
+        // Find the staff member
+        const staff = salesStaff.find(s => s.id === id);
+        
+        return {
+          id,
+          name: staff?.username || 'Unknown',
+          totalSales: totalSales[0].count || 0,
+          totalRevenue: Number(totalSales[0].revenue) || 0,
+          monthlySales: monthlySales[0].count || 0,
+          monthlyRevenue: Number(monthlySales[0].revenue) || 0,
+          target: targets.length > 0 ? {
+            revenueTarget: Number(targets[0].revenueTarget),
+            unitsTarget: targets[0].unitsTarget,
+            id: targets[0].id
+          } : null
+        };
+      }));
+      
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching dealer performance:", error);
+      res.status(500).json({ message: "Error fetching dealer performance" });
+    }
+  });
+  
+  // Set sales target for a sales person
+  app.post("/api/dealer/sales-targets", isAuthenticated, hasRole("dealer"), async (req, res) => {
+    try {
+      const dealerId = req.user!.id;
+      const targetData = insertSalesTargetSchema.parse(req.body);
+      
+      // Check if salesperson belongs to this dealer
+      const salesPerson = await db.select()
+        .from(users)
+        .where(and(
+          eq(users.id, targetData.salesPersonId),
+          eq(users.role, "sales"),
+          eq(users.dealerId, dealerId)
+        ))
+        .limit(1);
+      
+      if (salesPerson.length === 0) {
+        return res.status(403).json({ message: "The sales person doesn't belong to your dealership" });
+      }
+      
+      // Insert sales target
+      const [newTarget] = await db.insert(salesTargets).values({
+        ...targetData,
+        targetMonth: new Date(targetData.targetMonth)
+      }).returning();
+      
+      res.status(201).json(newTarget);
+    } catch (error) {
+      console.error("Error creating sales target:", error);
+      res.status(400).json({ 
+        message: "Error creating sales target", 
         error: error instanceof Error ? error.message : "Unknown error" 
       });
     }
