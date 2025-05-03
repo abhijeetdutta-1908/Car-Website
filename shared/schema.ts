@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, uniqueIndex, integer, decimal, varchar, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, uniqueIndex, integer, decimal, varchar, pgEnum, date } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
@@ -14,6 +14,9 @@ export type UserRole = typeof UserRole[keyof typeof UserRole];
 
 // Define car status enum
 export const carStatusEnum = pgEnum('car_status', ['in_stock', 'out_of_stock', 'reserved', 'sold']);
+
+// Define order status enum
+export const orderStatusEnum = pgEnum('order_status', ['pending', 'confirmed', 'delivered', 'cancelled']);
 
 // Define users table
 export const users = pgTable("users", {
@@ -42,6 +45,9 @@ export const customers = pgTable("customers", {
   email: text("email").notNull(),
   phone: text("phone"),
   address: text("address"),
+  age: integer("age"),
+  gender: text("gender"),
+  occupation: text("occupation"),
   notes: text("notes"),
   salesPersonId: integer("sales_person_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -64,14 +70,67 @@ export const cars = pgTable("cars", {
   status: text("status").default('in_stock').notNull(),
   features: text("features"),
   imageUrl: text("image_url"),
+  restockDate: date("restock_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Define orders table
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").notNull().references(() => customers.id),
+  carId: integer("car_id").notNull().references(() => cars.id),
+  salesPersonId: integer("sales_person_id").notNull().references(() => users.id),
+  orderDate: timestamp("order_date").defaultNow().notNull(),
+  status: text("status").default('pending').$type<"pending" | "confirmed" | "delivered" | "cancelled">(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Define sales targets table
+export const salesTargets = pgTable("sales_targets", {
+  id: serial("id").primaryKey(),
+  salesPersonId: integer("sales_person_id").notNull().references(() => users.id),
+  targetMonth: date("target_month").notNull(),
+  revenueTarget: decimal("revenue_target", { precision: 10, scale: 2 }).notNull(),
+  unitsTarget: integer("units_target").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Define table relationships
-export const customersRelations = relations(customers, ({ one }) => ({
+export const customersRelations = relations(customers, ({ one, many }) => ({
   salesPerson: one(users, {
     fields: [customers.salesPersonId],
+    references: [users.id],
+  }),
+  orders: many(orders),
+}));
+
+export const carsRelations = relations(cars, ({ many }) => ({
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  customer: one(customers, {
+    fields: [orders.customerId],
+    references: [customers.id],
+  }),
+  car: one(cars, {
+    fields: [orders.carId],
+    references: [cars.id],
+  }),
+  salesPerson: one(users, {
+    fields: [orders.salesPersonId],
+    references: [users.id],
+  }),
+}));
+
+export const salesTargetsRelations = relations(salesTargets, ({ one }) => ({
+  salesPerson: one(users, {
+    fields: [salesTargets.salesPersonId],
     references: [users.id],
   }),
 }));
@@ -149,3 +208,42 @@ export type Customer = z.infer<typeof selectCustomerSchema>;
 export type InsertCar = z.infer<typeof insertCarSchema>;
 export const selectCarSchema = createSelectSchema(cars);
 export type Car = z.infer<typeof selectCarSchema>;
+
+// Order schema
+export const insertOrderSchema = createInsertSchema(orders)
+  .extend({
+    customerId: z.number().positive("Customer ID is required"),
+    carId: z.number().positive("Car ID is required"),
+    salesPersonId: z.number().positive("Sales person ID is required"),
+    status: z.enum(['pending', 'confirmed', 'delivered', 'cancelled']).optional(),
+    totalAmount: z.number().positive("Total amount must be positive"),
+    notes: z.string().optional(),
+  })
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    orderDate: true,
+  });
+
+export const selectOrderSchema = createSelectSchema(orders);
+export type Order = z.infer<typeof selectOrderSchema>;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+// Sales target schema
+export const insertSalesTargetSchema = createInsertSchema(salesTargets)
+  .extend({
+    salesPersonId: z.number().positive("Sales person ID is required"),
+    targetMonth: z.date(),
+    revenueTarget: z.number().positive("Revenue target must be positive"),
+    unitsTarget: z.number().positive("Units target must be positive"),
+  })
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  });
+
+export const selectSalesTargetSchema = createSelectSchema(salesTargets);
+export type SalesTarget = z.infer<typeof selectSalesTargetSchema>;
+export type InsertSalesTarget = z.infer<typeof insertSalesTargetSchema>;
