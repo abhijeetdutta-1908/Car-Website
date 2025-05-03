@@ -369,18 +369,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )`
       );
       
-      const ordersList = await db.execute(
-        `SELECT o.*, 
+      const ordersList = await db.execute(sql`
+        SELECT o.*, 
           c.first_name as customer_first_name, 
           c.last_name as customer_last_name,
           cars.make, cars.model, cars.year
          FROM orders o
          JOIN customers c ON o.customer_id = c.id
          JOIN cars ON o.car_id = cars.id
-         WHERE o.sales_person_id = $1
-         ORDER BY o.created_at DESC`,
-        [req.user!.id]
-      );
+         WHERE o.sales_person_id = ${req.user!.id}
+         ORDER BY o.created_at DESC
+      `);
       
       res.json(ordersList.rows);
     } catch (error) {
@@ -394,17 +393,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       
-      const orderResult = await db.execute(
-        `SELECT o.*, 
+      const orderResult = await db.execute(sql`
+        SELECT o.*, 
           c.first_name as customer_first_name, 
           c.last_name as customer_last_name,
           cars.make, cars.model, cars.year, cars.color, cars.vin
          FROM orders o
          JOIN customers c ON o.customer_id = c.id
          JOIN cars ON o.car_id = cars.id
-         WHERE o.id = $1 AND o.sales_person_id = $2`,
-        [orderId, req.user!.id]
-      );
+         WHERE o.id = ${orderId} AND o.sales_person_id = ${req.user!.id}
+      `);
       
       if (orderResult.rows.length === 0) {
         return res.status(404).json({ message: "Order not found" });
