@@ -45,9 +45,6 @@ export const customers = pgTable("customers", {
   email: text("email").notNull(),
   phone: text("phone"),
   address: text("address"),
-  age: integer("age"),
-  gender: text("gender"),
-  occupation: text("occupation"),
   notes: text("notes"),
   salesPersonId: integer("sales_person_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -189,6 +186,7 @@ export const insertCarSchema = createInsertSchema(cars)
     status: z.enum(['in_stock', 'out_of_stock', 'reserved', 'sold']).optional(),
     features: z.string().optional(),
     imageUrl: z.string().optional(),
+    restockDate: z.string().optional().or(z.date().optional()),
   })
   .omit({
     id: true,
