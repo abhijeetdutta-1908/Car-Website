@@ -111,7 +111,7 @@ export default function SalesDashboard() {
           <StatCard
             title="Conversion Rate"
             valueText={data?.stats.conversionRate}
-            icon={<Percent className="h-6 w-6" />}
+            icon={<TrendingUp className="h-6 w-6" />}
             color="bg-green-500"
             isLoading={isLoading}
           />
@@ -190,6 +190,15 @@ function ActionButton({ icon, label }: { icon: React.ReactNode, label: string })
   );
 }
 
+// Define the Activity type
+interface Activity {
+  id: string;
+  type: 'Order' | 'Customer';
+  description: string;
+  time: string;
+  date: Date;
+}
+
 function RecentActivitiesCard() {
   // Fetch orders for recent activities
   const { data: orders, isLoading: ordersLoading } = useQuery<any[]>({
@@ -215,8 +224,8 @@ function RecentActivitiesCard() {
   };
 
   // Create activities array from orders and customers
-  const getActivities = () => {
-    const activities = [];
+  const getActivities = (): Activity[] => {
+    const activities: Activity[] = [];
     
     // Add recent orders
     if (orders && Array.isArray(orders)) {
@@ -681,8 +690,8 @@ function InventoryTab() {
                     <TableCell>{car.year}</TableCell>
                     <TableCell>${car.price.toLocaleString()}</TableCell>
                     <TableCell>
-                      <Badge variant={car.status === 'in_stock' ? 'success' : 
-                        car.status === 'reserved' ? 'warning' : 
+                      <Badge variant={car.status === 'in_stock' ? 'default' : 
+                        car.status === 'reserved' ? 'outline' : 
                         car.status === 'out_of_stock' ? 'secondary' : 'destructive'}>
                         {car.status === 'in_stock' ? 'In Stock' : 
                          car.status === 'out_of_stock' ? 'Out of Stock' : 
