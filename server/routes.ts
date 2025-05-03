@@ -341,6 +341,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // === ORDERS API ENDPOINTS ===
+  
+  // Get all orders for the logged-in sales person
+  app.get("/api/orders", isAuthenticated, hasRole("sales"), async (req, res) => {
+    try {
+      // Create orders table if it doesn't exist
+      await db.execute(
+        `CREATE TABLE IF NOT EXISTS "orders" (
+          "id" serial PRIMARY KEY NOT NULL,
+          "customer_id" integer NOT NULL REFERENCES "customers"("id"),
+          "car_id" integer NOT NULL REFERENCES "cars"("id"),
+          "sales_person_id" integer NOT NULL REFERENCES "users"("id"),
+          "order_date" timestamp DEFAULT now() NOT NULL,
+          "status" text DEFAULT 'pending' NOT NULL,
+          "total_amount" numeric(10, 2) NOT NULL,
+          "notes" text,
+          "created_at" timestamp DEFAULT now() NOT NULL,
+          "updated_at" timestamp DEFAULT now() NOT NULL
+        )`
+      );
+      
+      const ordersList = await db.execute(
+        `SELECT o.*, 
+          c.first_name as customer_first_name, 
+          c.last_name as customer_last_name,
+          cars.make, cars.model, cars.year
+         FROM orders o
+         JOIN customers c ON o.customer_id = c.id
+         JOIN cars ON o.car_id = cars.id
+         WHERE o.sales_person_id = $1
+         ORDER BY o.created_at DESC`,
+        [req.user!.id]
+      );
+      
+      res.json(ordersList.rows);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      res.status(500).json({ message: "Error fetching orders" });
+    }
+  });
+  
+  // Get specific order
+  app.get("/api/orders/:id", isAuthenticated, hasRole("sales"), async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      
+      const orderResult = await db.execute(
+        `SELECT o.*, 
+          c.first_name as customer_first_name, 
+          c.last_name as customer_last_name,
+          cars.make, cars.model, cars.year, cars.color, cars.vin
+         FROM orders o
+         JOIN customers c ON o.customer_id = c.id
+         JOIN cars ON o.car_id = cars.id
+         WHERE o.id = $1 AND o.sales_person_id = $2`,
+        [orderId, req.user!.id]
+      );
+      
+      if (orderResult.rows.length === 0) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      res.json(orderResult.rows[0]);
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      res.status(500).json({ message: "Error fetching order" });
+    }
+  });
+  
+  // Create a new order
+  app.post("/api/orders", isAuthenticated, hasRole("sales"), async (req, res) => {
+    try {
+      const { customerId, carId, totalAmount, notes } = req.body;
+      
+      // Validate customer exists and belongs to this sales person
+      const customer = await db.execute(
+        `SELECT * FROM customers WHERE id = $1 AND sales_person_id = $2`,
+        [customerId, req.user!.id]
+      );
+      
+      if (customer.rows.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      // Validate car exists and is in stock
+      const car = await db.execute(
+        `SELECT * FROM cars WHERE id = $1 AND status = 'in_stock'`,
+        [carId]
+      );
+      
+      if (car.rows.length === 0) {
+        return res.status(400).json({ message: "Car not available for purchase" });
+      }
+      
+      // Create the order
+      const newOrder = await db.execute(
+        `INSERT INTO orders 
+         (customer_id, car_id, sales_person_id, total_amount, notes)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [customerId, carId, req.user!.id, totalAmount, notes]
+      );
+      
+      // Update car status to sold
+      await db.execute(
+        `UPDATE cars SET status = 'sold' WHERE id = $1`,
+        [carId]
+      );
+      
+      res.status(201).json(newOrder.rows[0]);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      res.status(400).json({ 
+        message: "Error creating order", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Update order status
+  app.patch("/api/orders/:id", isAuthenticated, hasRole("sales"), async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { status, notes } = req.body;
+      
+      // Verify order exists and belongs to this sales person
+      const existingOrder = await db.execute(
+        `SELECT * FROM orders WHERE id = $1 AND sales_person_id = $2`,
+        [orderId, req.user!.id]
+      );
+      
+      if (existingOrder.rows.length === 0) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      // Update the order
+      const updateFields = [];
+      const updateValues = [];
+      let valueIndex = 1;
+      
+      if (status) {
+        updateFields.push(`status = $${valueIndex}`);
+        updateValues.push(status);
+        valueIndex++;
+      }
+      
+      if (notes !== undefined) {
+        updateFields.push(`notes = $${valueIndex}`);
+        updateValues.push(notes);
+        valueIndex++;
+      }
+      
+      // Always update the updated_at timestamp
+      updateFields.push(`updated_at = NOW()`);
+      
+      // Add order ID and sales person ID to values array
+      updateValues.push(orderId);
+      updateValues.push(req.user!.id);
+      
+      const updatedOrder = await db.execute(
+        `UPDATE orders 
+         SET ${updateFields.join(', ')} 
+         WHERE id = $${valueIndex} AND sales_person_id = $${valueIndex + 1}
+         RETURNING *`,
+        updateValues
+      );
+      
+      res.json(updatedOrder.rows[0]);
+    } catch (error) {
+      console.error("Error updating order:", error);
+      res.status(400).json({ 
+        message: "Error updating order", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
   // === CAR INVENTORY API ENDPOINTS ===
   
   // Get all cars

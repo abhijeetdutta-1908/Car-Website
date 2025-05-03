@@ -10,7 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LineChart, UserRound, Percent, Car, ShoppingCart, ChevronRight, PlusCircle, BarChart3, CalendarClock } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LineChart, UserRound, Car, ShoppingCart, ChevronRight, PlusCircle, BarChart3, CalendarClock, DollarSign, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -189,12 +191,65 @@ function ActionButton({ icon, label }: { icon: React.ReactNode, label: string })
 }
 
 function RecentActivitiesCard() {
-  const activities = [
-    { id: 1, type: "Order", description: "New order created for John Smith", time: "2 hours ago" },
-    { id: 2, type: "Customer", description: "Added Emily Johnson as a new customer", time: "4 hours ago" },
-    { id: 3, type: "Follow-up", description: "Scheduled call with Michael Brown", time: "Yesterday" },
-    { id: 4, type: "Sale", description: "Completed sale of Honda Civic", time: "2 days ago" },
-  ];
+  // Fetch orders for recent activities
+  const { data: orders, isLoading: ordersLoading } = useQuery<any[]>({
+    queryKey: ["/api/orders"],
+  });
+
+  // Fetch customers for recent activities
+  const { data: customers, isLoading: customersLoading } = useQuery<any[]>({
+    queryKey: ["/api/customers"],
+  });
+
+  // Format date to relative time (e.g., "2 hours ago")
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 172800) return 'Yesterday';
+    return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  };
+
+  // Create activities array from orders and customers
+  const getActivities = () => {
+    const activities = [];
+    
+    // Add recent orders
+    if (orders && Array.isArray(orders)) {
+      orders.slice(0, 5).forEach(order => {
+        activities.push({
+          id: `order-${order.id}`,
+          type: "Order",
+          description: `New order created for ${order.customer_first_name} ${order.customer_last_name} - ${order.make} ${order.model}`,
+          time: formatRelativeTime(order.created_at),
+          date: new Date(order.created_at)
+        });
+      });
+    }
+
+    // Add recent customers
+    if (customers && Array.isArray(customers)) {
+      customers.slice(0, 5).forEach(customer => {
+        activities.push({
+          id: `customer-${customer.id}`,
+          type: "Customer",
+          description: `Added ${customer.firstName} ${customer.lastName} as a new customer`,
+          time: formatRelativeTime(customer.createdAt),
+          date: new Date(customer.createdAt)
+        });
+      });
+    }
+    
+    // Sort by date, newest first
+    return activities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
+  };
+
+  const activities = getActivities();
+  const isLoading = ordersLoading || customersLoading;
 
   return (
     <Card className="shadow-sm">
@@ -206,18 +261,31 @@ function RecentActivitiesCard() {
       </CardHeader>
       <CardContent className="px-0">
         <ScrollArea className="h-[220px]">
-          {activities.map((activity) => (
-            <div key={activity.id} className="flex justify-between items-start px-6 py-3 border-b last:border-0">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="outline">{activity.type}</Badge>
-                  <span className="text-sm text-muted-foreground">{activity.time}</span>
-                </div>
-                <p className="mt-1">{activity.description}</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
+          {isLoading ? (
+            <div className="space-y-4 px-6">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
             </div>
-          ))}
+          ) : activities.length > 0 ? (
+            activities.map((activity) => (
+              <div key={activity.id} className="flex justify-between items-start px-6 py-3 border-b last:border-0">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline">{activity.type}</Badge>
+                    <span className="text-sm text-muted-foreground">{activity.time}</span>
+                  </div>
+                  <p className="mt-1">{activity.description}</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
+              </div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
+              <p className="mb-2">No recent activity to display</p>
+              <p className="text-sm">Activities will appear here as you work with customers and create orders.</p>
+            </div>
+          )}
         </ScrollArea>
       </CardContent>
     </Card>
@@ -225,6 +293,16 @@ function RecentActivitiesCard() {
 }
 
 function MonthlyTargetsCard() {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ["/api/sales/dashboard"],
+  });
+  
+  // Extract the values from the dashboard data
+  const monthlyRevenue = data?.stats?.monthlyRevenue || 0;
+  const revenueTarget = data?.stats?.revenueTarget || 100000;
+  const monthlyCarsSold = data?.stats?.monthlyCarsSold || 0;
+  const unitsTarget = data?.stats?.unitsTarget || 10;
+  
   return (
     <Card className="shadow-sm">
       <CardHeader>
@@ -234,10 +312,26 @@ function MonthlyTargetsCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid md:grid-cols-2 gap-6">
-          <TargetProgress label="Revenue Target" current={78500} target={100000} prefix="$" />
-          <TargetProgress label="Units Sold" current={6} target={10} />
-        </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            <TargetProgress 
+              label="Revenue Target" 
+              current={monthlyRevenue} 
+              target={revenueTarget} 
+              prefix="$" 
+            />
+            <TargetProgress 
+              label="Units Sold" 
+              current={monthlyCarsSold} 
+              target={unitsTarget} 
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -499,35 +593,220 @@ function AddCustomerDialog({ isOpen, onClose, onSubmit, isSubmitting }: AddCusto
 }
 
 function InventoryTab() {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [makeFilter, setMakeFilter] = useState<string>("all");
+  
+  // Fetch all cars
+  const { data: cars, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/cars", { status: statusFilter, make: makeFilter }],
+  });
+  
+  // Extract unique makes for filter dropdown
+  const uniqueMakes = cars ? 
+    Array.from(new Set(cars.map(car => car.make)))
+      .sort((a, b) => a.localeCompare(b)) : 
+    [];
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Car Inventory</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle>Car Inventory</CardTitle>
+          <div className="flex items-center space-x-2">
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="in_stock">In Stock</SelectItem>
+                <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                <SelectItem value="reserved">Reserved</SelectItem>
+                <SelectItem value="sold">Sold</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select
+              value={makeFilter}
+              onValueChange={(value) => setMakeFilter(value)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Make" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Makes</SelectItem>
+                {uniqueMakes.map((make) => (
+                  <SelectItem key={make} value={make}>
+                    {make}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <CardDescription>
-          Browse available vehicles in stock
+          Browse available vehicles in inventory
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-10 text-muted-foreground">
-          <Car className="h-10 w-10 mx-auto mb-3 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">Explore Available Vehicles</h3>
-          <p className="max-w-md mx-auto mb-6">
-            Browse our entire inventory of vehicles. Filter by make, model, year, and price range to find the perfect car for your customers.
-          </p>
-          <Button variant="outline">View Inventory</Button>
-        </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : cars && cars.length > 0 ? (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Make/Model</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Restock Date</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cars.map((car) => (
+                  <TableRow key={car.id}>
+                    <TableCell>
+                      <div className="font-medium">{car.make} {car.model}</div>
+                      <div className="text-sm text-muted-foreground">{car.color}</div>
+                    </TableCell>
+                    <TableCell>{car.year}</TableCell>
+                    <TableCell>${car.price.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Badge variant={car.status === 'in_stock' ? 'success' : 
+                        car.status === 'reserved' ? 'warning' : 
+                        car.status === 'out_of_stock' ? 'secondary' : 'destructive'}>
+                        {car.status === 'in_stock' ? 'In Stock' : 
+                         car.status === 'out_of_stock' ? 'Out of Stock' : 
+                         car.status === 'reserved' ? 'Reserved' : 'Sold'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {car.status === 'out_of_stock' && car.restockDate ? 
+                        new Date(car.restockDate).toLocaleDateString() : 
+                        car.status === 'out_of_stock' ? 'Unknown' : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {car.status === 'in_stock' && (
+                        <Button size="sm" variant="outline">Select</Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            <Car className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <h3 className="text-lg font-medium mb-2">No Vehicles Found</h3>
+            <p className="max-w-md mx-auto mb-6">
+              {statusFilter !== 'all' || makeFilter !== 'all' 
+                ? "No cars match your current filters. Try changing your search criteria."
+                : "There are no cars in the inventory yet. Cars will appear here once they've been added to the system."}
+            </p>
+            <Button variant="outline" onClick={() => {
+              setStatusFilter('all');
+              setMakeFilter('all');
+            }}>
+              Reset Filters
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 function OrdersTab() {
+  const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
+  const [orderStep, setOrderStep] = useState<'customer' | 'car' | 'review'>('customer');
+  const queryClientInstance = useQueryClient();
+
+  // Fetch orders
+  const { data: orders, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/orders"],
+  });
+
+  // Fetch customers for selection
+  const { data: customers } = useQuery<any[]>({
+    queryKey: ["/api/customers"],
+  });
+
+  // Fetch in-stock cars for selection
+  const { data: cars } = useQuery<any[]>({
+    queryKey: ["/api/cars", { status: "in_stock" }],
+  });
+
+  // Create order mutation
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/orders", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClientInstance.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClientInstance.invalidateQueries({ queryKey: ["/api/cars"] });
+      queryClientInstance.invalidateQueries({ queryKey: ["/api/sales/dashboard"] });
+      setIsCreateOrderOpen(false);
+      resetOrderForm();
+    },
+    onError: (error) => {
+      console.error("Error creating order:", error);
+    },
+  });
+
+  const resetOrderForm = () => {
+    setSelectedCustomerId(null);
+    setSelectedCarId(null);
+    setOrderStep('customer');
+  };
+
+  const handleCreateOrder = () => {
+    if (!selectedCustomerId || !selectedCarId) return;
+    
+    const selectedCar = cars?.find(car => car.id === selectedCarId);
+    
+    createOrderMutation.mutate({
+      customerId: selectedCustomerId,
+      carId: selectedCarId,
+      totalAmount: selectedCar?.price || 0,
+      notes: "",
+    });
+  };
+
+  // Format the status display
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary">Pending</Badge>;
+      case 'confirmed':
+        return <Badge variant="outline">Confirmed</Badge>;
+      case 'delivered':
+        return <Badge variant="default">Delivered</Badge>;
+      case 'cancelled':
+        return <Badge variant="destructive">Cancelled</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Order Management</CardTitle>
-          <Button size="sm">
+          <Button size="sm" onClick={() => setIsCreateOrderOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
             Create Order
           </Button>
@@ -537,15 +816,189 @@ function OrdersTab() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-10 text-muted-foreground">
-          <ShoppingCart className="h-10 w-10 mx-auto mb-3 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">Your Order Dashboard</h3>
-          <p className="max-w-md mx-auto mb-6">
-            Create new orders, track existing ones, and manage the entire sales process from initial inquiry to final delivery.
-          </p>
-          <Button variant="outline">View All Orders</Button>
-        </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : orders && orders.length > 0 ? (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>#{order.id}</TableCell>
+                    <TableCell>
+                      {order.customer_first_name} {order.customer_last_name}
+                    </TableCell>
+                    <TableCell>{order.make} {order.model} ({order.year})</TableCell>
+                    <TableCell>${Number(order.total_amount).toLocaleString()}</TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell>{new Date(order.order_date).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            <ShoppingCart className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <h3 className="text-lg font-medium mb-2">No Orders Yet</h3>
+            <p className="max-w-md mx-auto mb-6">
+              Create new orders, track existing ones, and manage the entire sales process from initial inquiry to final delivery.
+            </p>
+            <Button variant="outline" onClick={() => setIsCreateOrderOpen(true)}>
+              Create Your First Order
+            </Button>
+          </div>
+        )}
       </CardContent>
+
+      {/* Create Order Dialog */}
+      <Dialog open={isCreateOrderOpen} onOpenChange={setIsCreateOrderOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Create New Order</DialogTitle>
+            <DialogDescription>
+              {orderStep === 'customer' && "Select a customer for this order."}
+              {orderStep === 'car' && "Choose a vehicle from available inventory."}
+              {orderStep === 'review' && "Review and confirm order details."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {orderStep === 'customer' && (
+            <div className="space-y-4">
+              <div className="max-h-[300px] overflow-y-auto border rounded-md">
+                {customers && customers.length > 0 ? (
+                  <div className="divide-y">
+                    {customers.map((customer) => (
+                      <div 
+                        key={customer.id} 
+                        className={`p-3 cursor-pointer hover:bg-muted transition-colors ${selectedCustomerId === customer.id ? 'bg-muted' : ''}`}
+                        onClick={() => setSelectedCustomerId(customer.id)}
+                      >
+                        <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                        <div className="text-sm text-muted-foreground">{customer.email} • {customer.phone || 'No phone'}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">
+                    No customers found. Please add a customer first.
+                  </div>
+                )}
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOrderOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => setOrderStep('car')} 
+                  disabled={selectedCustomerId === null}
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {orderStep === 'car' && (
+            <div className="space-y-4">
+              <div className="max-h-[300px] overflow-y-auto border rounded-md">
+                {cars && cars.length > 0 ? (
+                  <div className="divide-y">
+                    {cars.map((car) => (
+                      <div 
+                        key={car.id} 
+                        className={`p-3 cursor-pointer hover:bg-muted transition-colors ${selectedCarId === car.id ? 'bg-muted' : ''}`}
+                        onClick={() => setSelectedCarId(car.id)}
+                      >
+                        <div className="font-medium">{car.make} {car.model} ({car.year})</div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">{car.color} • VIN: {car.vin}</span>
+                          <span className="font-medium">${Number(car.price).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">
+                    No cars available in inventory.
+                  </div>
+                )}
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOrderStep('customer')}>
+                  Back
+                </Button>
+                <Button 
+                  onClick={() => setOrderStep('review')} 
+                  disabled={selectedCarId === null}
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {orderStep === 'review' && (
+            <div className="space-y-4">
+              {selectedCustomerId && selectedCarId && (
+                <div className="border rounded-md p-4 space-y-3">
+                  <div>
+                    <h3 className="font-medium">Customer</h3>
+                    <p className="text-sm">
+                      {customers?.find(c => c.id === selectedCustomerId)?.firstName || ''} {' '}
+                      {customers?.find(c => c.id === selectedCustomerId)?.lastName || ''}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium">Vehicle</h3>
+                    <p className="text-sm">
+                      {cars?.find(c => c.id === selectedCarId)?.make || ''} {' '}
+                      {cars?.find(c => c.id === selectedCarId)?.model || ''} {' '}
+                      ({cars?.find(c => c.id === selectedCarId)?.year || ''})
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium">Total Amount</h3>
+                    <p className="text-lg font-bold">
+                      ${Number(cars?.find(c => c.id === selectedCarId)?.price || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOrderStep('car')}>
+                  Back
+                </Button>
+                <Button 
+                  onClick={handleCreateOrder}
+                  disabled={createOrderMutation.isPending}
+                >
+                  {createOrderMutation.isPending ? 'Creating...' : 'Create Order'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
