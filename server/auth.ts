@@ -6,7 +6,12 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertUserSchema, loginUserSchema } from "@shared/schema";
+import { insertUserSchema, loginUserSchema, users, User } from "@shared/schema";
+import { createSelectSchema } from "drizzle-zod";
+
+// Create an AuthUser type that includes the password field
+const authUserSchema = createSelectSchema(users);
+type AuthUser = z.infer<typeof authUserSchema>;
 
 declare global {
   namespace Express {
@@ -67,6 +72,7 @@ export function setupAuth(app: Express) {
         passwordField: "password",
       },
       async (email, password, done) => {
+        console.log("Authenticating user with email:", email);
         try {
           const user = await storage.getUserByEmail(email);
           if (!user || !(await comparePasswords(password, user.password))) {
@@ -96,6 +102,7 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
+      console.log("Register request received:", req.body);
       // Validate request body
       const userData = insertUserSchema.parse(req.body);
       
@@ -135,6 +142,7 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", (req, res, next) => {
     try {
+      console.log("Login request received:", req.body);
       // Validate request body
       const loginData = loginUserSchema.parse(req.body);
       

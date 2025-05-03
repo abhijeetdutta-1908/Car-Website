@@ -5,6 +5,12 @@ import { InsertUser, User } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import session from "express-session";
 import { pool } from "@db/index";
+import { createSelectSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Create AuthUser type that includes the password field
+const authUserSchema = createSelectSchema(users);
+type AuthUser = z.infer<typeof authUserSchema>;
 
 const PostgresSessionStore = connectPg(session);
 
@@ -34,7 +40,11 @@ export class DatabaseStorage implements IStorage {
         id: users.id,
         username: users.username,
         email: users.email,
+        password: users.password,
         role: users.role,
+        dealerId: users.dealerId,
+        profilePicture: users.profilePicture,
+        phoneNumber: users.phoneNumber, 
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
       });
