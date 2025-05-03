@@ -793,7 +793,16 @@ function InventoryTab() {
   });
 
   function onSubmit(values: z.infer<typeof carSchema>) {
-    addCarMutation.mutate(values);
+    // Clone the values and process the restockDate
+    const dataToSubmit = {
+      ...values,
+      // Only include restockDate if specified and the status is out_of_stock
+      restockDate: values.status === 'out_of_stock' && values.restockDate 
+        ? values.restockDate 
+        : undefined
+    };
+    
+    addCarMutation.mutate(dataToSubmit);
   }
 
   const statusColors = {
@@ -996,24 +1005,26 @@ function InventoryTab() {
                     )}
                   />
                   
-                  <FormField
-                    control={form.control}
-                    name="restockDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Restock Date (if out of stock)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="date" 
-                            {...field}
-                            value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
-                            onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {form.watch("status") === "out_of_stock" && (
+                    <FormField
+                      control={form.control}
+                      name="restockDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Restock Date</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field}
+                              value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   
                   <DialogFooter>
                     <Button 

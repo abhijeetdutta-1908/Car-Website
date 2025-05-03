@@ -861,8 +861,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate request body
       const carData = insertCarSchema.parse(req.body);
       
+      // Process the carData to ensure restockDate is handled correctly
+      const dataToInsert = {
+        ...carData,
+        restockDate: carData.restockDate ? new Date(carData.restockDate) : null
+      };
+      
       // Insert the car
-      const [newCar] = await db.insert(cars).values(carData).returning();
+      const [newCar] = await db.insert(cars).values(dataToInsert).returning();
       
       res.status(201).json(newCar);
     } catch (error) {
@@ -893,18 +899,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Car not found" });
       }
       
+      // Validate request body
+      const carData = insertCarSchema.parse(req.body);
+      
       // Update the car
       const [updatedCar] = await db.update(cars)
         .set({
-          make: req.body.make,
-          model: req.body.model,
-          year: req.body.year,
-          color: req.body.color,
-          price: req.body.price,
-          vin: req.body.vin,
-          status: req.body.status,
-          features: req.body.features,
-          imageUrl: req.body.imageUrl,
+          make: carData.make,
+          model: carData.model,
+          year: carData.year,
+          color: carData.color,
+          price: carData.price,
+          vin: carData.vin,
+          status: carData.status,
+          features: carData.features,
+          imageUrl: carData.imageUrl,
+          quantity: carData.quantity,
+          restockDate: carData.restockDate ? new Date(carData.restockDate) : null,
           updatedAt: new Date()
         })
         .where(eq(cars.id, carId))
