@@ -59,7 +59,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/sales/dashboard", isAuthenticated, hasRole("sales"), async (req, res) => {
     try {
-      const salesPersonId = req.user?.id;
+      // Ensure user is authenticated and has a valid ID
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      const salesPersonId = req.user.id;
 
       // Get current date info for monthly calculations
       const now = new Date();
@@ -68,9 +73,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
       const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
       
-      // Get current day start and end for daily calculations
-      const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-      const endOfToday = new Date(now.setHours(23, 59, 59, 999));
+      // Get current day start and end for daily calculations - fix date handling
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
 
       // Create orders table if it doesn't exist
       await db.execute(
@@ -89,43 +97,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Calculate daily sales (total sales for today)
-      const dailySalesResult = await db.execute(
-        `SELECT COUNT(*) FROM orders 
-         WHERE sales_person_id = $1 
-         AND order_date >= $2 
-         AND order_date <= $3`,
-        [salesPersonId, startOfToday, endOfToday]
-      );
+      const dailySalesResult = await db.execute(sql`
+        SELECT COUNT(*) FROM orders 
+        WHERE sales_person_id = ${salesPersonId} 
+        AND order_date >= ${startOfToday} 
+        AND order_date <= ${endOfToday}
+      `);
       const dailySales = parseInt(dailySalesResult.rows[0]?.count || '0', 10);
 
       // Calculate monthly sales for target progress
-      const monthlyCarsSoldResult = await db.execute(
-        `SELECT COUNT(*) FROM orders 
-         WHERE sales_person_id = $1 
-         AND order_date >= $2 
-         AND order_date <= $3`,
-        [salesPersonId, firstDayOfMonth, lastDayOfMonth]
-      );
+      const monthlyCarsSoldResult = await db.execute(sql`
+        SELECT COUNT(*) FROM orders 
+        WHERE sales_person_id = ${salesPersonId} 
+        AND order_date >= ${firstDayOfMonth} 
+        AND order_date <= ${lastDayOfMonth}
+      `);
       const monthlyCarsSold = parseInt(monthlyCarsSoldResult.rows[0]?.count || '0', 10);
 
       // Get total revenue for the month
-      const monthlyRevenueResult = await db.execute(
-        `SELECT COALESCE(SUM(total_amount), 0) as total FROM orders 
-         WHERE sales_person_id = $1 
-         AND order_date >= $2 
-         AND order_date <= $3`,
-        [salesPersonId, firstDayOfMonth, lastDayOfMonth]
-      );
+      const monthlyRevenueResult = await db.execute(sql`
+        SELECT COALESCE(SUM(total_amount), 0) as total FROM orders 
+        WHERE sales_person_id = ${salesPersonId} 
+        AND order_date >= ${firstDayOfMonth} 
+        AND order_date <= ${lastDayOfMonth}
+      `);
       const monthlyRevenue = parseFloat(monthlyRevenueResult.rows[0]?.total || '0');
 
       // Count new leads (customers created this month)
-      const leadsResult = await db.execute(
-        `SELECT COUNT(*) FROM customers 
-         WHERE sales_person_id = $1 
-         AND created_at >= $2 
-         AND created_at <= $3`,
-        [salesPersonId, firstDayOfMonth, lastDayOfMonth]
-      );
+      const leadsResult = await db.execute(sql`
+        SELECT COUNT(*) FROM customers 
+        WHERE sales_person_id = ${salesPersonId} 
+        AND created_at >= ${firstDayOfMonth} 
+        AND created_at <= ${lastDayOfMonth}
+      `);
       const leadsGenerated = parseInt(leadsResult.rows[0]?.count || '0', 10);
 
       // Calculate conversion rate (orders / leads)
@@ -136,38 +140,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create sales_targets table if it doesn't exist
-      await db.execute(
-        `CREATE TABLE IF NOT EXISTS "sales_targets" (
-          "id" serial PRIMARY KEY NOT NULL,
-          "sales_person_id" integer NOT NULL REFERENCES "users"("id"),
-          "target_month" date NOT NULL,
-          "revenue_target" numeric(10, 2) NOT NULL,
-          "units_target" integer NOT NULL,
-          "created_at" timestamp DEFAULT now() NOT NULL,
-          "updated_at" timestamp DEFAULT now() NOT NULL
-        )`
-      );
+      try {
+        await db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "sales_targets" (
+            "id" serial PRIMARY KEY NOT NULL,
+            "sales_person_id" integer NOT NULL REFERENCES "users"("id"),
+            "target_month" date NOT NULL,
+            "revenue_target" numeric(10, 2) NOT NULL,
+            "units_target" integer NOT NULL,
+            "created_at" timestamp DEFAULT now() NOT NULL,
+            "updated_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+      } catch (err) {
+        console.log("Sales targets table may already exist:", err);
+        // Continue execution
+      }
 
       // Get or create sales target for the month
       const targetMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-      const targetResult = await db.execute(
-        `SELECT * FROM sales_targets 
-         WHERE sales_person_id = $1 
-         AND target_month = $2`,
-        [salesPersonId, targetMonth]
-      );
+      const targetResult = await db.execute(sql`
+        SELECT * FROM sales_targets 
+        WHERE sales_person_id = ${salesPersonId} 
+        AND target_month = ${targetMonth}
+      `);
       
       let revenueTarget = 100000;
       let unitsTarget = 10;
       
       if (targetResult.rows.length === 0) {
         // Create default sales target if none exists
-        await db.execute(
-          `INSERT INTO sales_targets 
-           (sales_person_id, target_month, revenue_target, units_target) 
-           VALUES ($1, $2, $3, $4)`,
-          [salesPersonId, targetMonth, revenueTarget, unitsTarget]
-        );
+        await db.execute(sql`
+          INSERT INTO sales_targets 
+          (sales_person_id, target_month, revenue_target, units_target) 
+          VALUES (${salesPersonId}, ${targetMonth}, ${revenueTarget}, ${unitsTarget})
+        `);
       } else {
         // Use existing target
         revenueTarget = parseFloat(targetResult.rows[0].revenue_target);
