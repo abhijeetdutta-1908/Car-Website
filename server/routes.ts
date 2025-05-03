@@ -477,44 +477,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new order
   app.post("/api/orders", isAuthenticated, hasRole("sales"), async (req, res) => {
     try {
-      const { customerId, carId, totalAmount, notes } = req.body;
+      // Validate with Zod schema
+      const orderData = insertOrderSchema.parse(req.body);
       
       // Validate customer exists and belongs to this sales person
-      const customer = await db.execute(
-        `SELECT * FROM customers WHERE id = $1 AND sales_person_id = $2`,
-        [customerId, req.user!.id]
-      );
+      const customer = await db.select()
+        .from(customers)
+        .where(and(
+          eq(customers.id, orderData.customerId),
+          eq(customers.salesPersonId, req.user!.id)
+        ))
+        .limit(1);
       
-      if (customer.rows.length === 0) {
-        return res.status(404).json({ message: "Customer not found" });
+      if (customer.length === 0) {
+        return res.status(404).json({ message: "Customer not found or doesn't belong to you" });
       }
       
       // Validate car exists and is in stock
-      const car = await db.execute(
-        `SELECT * FROM cars WHERE id = $1 AND status = 'in_stock'`,
-        [carId]
-      );
+      const car = await db.select()
+        .from(cars)
+        .where(and(
+          eq(cars.id, orderData.carId),
+          eq(cars.status, "in_stock")
+        ))
+        .limit(1);
       
-      if (car.rows.length === 0) {
+      if (car.length === 0) {
         return res.status(400).json({ message: "Car not available for purchase" });
       }
       
-      // Create the order
-      const newOrder = await db.execute(
-        `INSERT INTO orders 
-         (customer_id, car_id, sales_person_id, total_amount, notes)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [customerId, carId, req.user!.id, totalAmount, notes]
-      );
+      // Create the order using Drizzle ORM
+      const [newOrder] = await db.insert(orders)
+        .values({
+          customerId: orderData.customerId,
+          carId: orderData.carId,
+          salesPersonId: req.user!.id,
+          totalAmount: orderData.totalAmount.toString(),
+          notes: orderData.notes,
+          status: 'pending',
+          orderDate: new Date()
+        })
+        .returning();
       
-      // Update car status to sold
-      await db.execute(
-        `UPDATE cars SET status = 'sold' WHERE id = $1`,
-        [carId]
-      );
+      // Update car status to reserved
+      await db.update(cars)
+        .set({
+          status: 'reserved',
+          updatedAt: new Date()
+        })
+        .where(eq(cars.id, orderData.carId));
       
-      res.status(201).json(newOrder.rows[0]);
+      res.status(201).json(newOrder);
     } catch (error) {
       console.error("Error creating order:", error);
       res.status(400).json({ 
@@ -531,48 +544,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, notes } = req.body;
       
       // Verify order exists and belongs to this sales person
-      const existingOrder = await db.execute(
-        `SELECT * FROM orders WHERE id = $1 AND sales_person_id = $2`,
-        [orderId, req.user!.id]
-      );
+      const existingOrders = await db.select()
+        .from(orders)
+        .where(and(
+          eq(orders.id, orderId),
+          eq(orders.salesPersonId, req.user!.id)
+        ))
+        .limit(1);
       
-      if (existingOrder.rows.length === 0) {
+      if (existingOrders.length === 0) {
         return res.status(404).json({ message: "Order not found" });
       }
       
-      // Update the order
-      const updateFields = [];
-      const updateValues = [];
-      let valueIndex = 1;
+      const existingOrder = existingOrders[0];
+      
+      // Prepare update data
+      const updateData: any = {
+        updatedAt: new Date()
+      };
       
       if (status) {
-        updateFields.push(`status = $${valueIndex}`);
-        updateValues.push(status);
-        valueIndex++;
+        updateData.status = status;
       }
       
       if (notes !== undefined) {
-        updateFields.push(`notes = $${valueIndex}`);
-        updateValues.push(notes);
-        valueIndex++;
+        updateData.notes = notes;
       }
       
-      // Always update the updated_at timestamp
-      updateFields.push(`updated_at = NOW()`);
+      // Update the order
+      const [updatedOrder] = await db.update(orders)
+        .set(updateData)
+        .where(and(
+          eq(orders.id, orderId),
+          eq(orders.salesPersonId, req.user!.id)
+        ))
+        .returning();
       
-      // Add order ID and sales person ID to values array
-      updateValues.push(orderId);
-      updateValues.push(req.user!.id);
+      // If order is confirmed, update car status to sold
+      if (status === 'confirmed' && existingOrder.status !== 'confirmed') {
+        await db.update(cars)
+          .set({
+            status: 'sold',
+            updatedAt: new Date()
+          })
+          .where(eq(cars.id, existingOrder.carId));
+      }
       
-      const updatedOrder = await db.execute(
-        `UPDATE orders 
-         SET ${updateFields.join(', ')} 
-         WHERE id = $${valueIndex} AND sales_person_id = $${valueIndex + 1}
-         RETURNING *`,
-        updateValues
-      );
-      
-      res.json(updatedOrder.rows[0]);
+      res.json(updatedOrder);
     } catch (error) {
       console.error("Error updating order:", error);
       res.status(400).json({ 

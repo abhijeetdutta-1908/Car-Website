@@ -748,11 +748,29 @@ function PerformanceTab() {
 function InventoryTab() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedCar, setSelectedCar] = useState<CarData | null>(null);
   const { data: cars, isLoading } = useQuery<CarData[]>({
     queryKey: ["/api/cars"],
   });
 
   const form = useForm<z.infer<typeof carSchema>>({
+    resolver: zodResolver(carSchema),
+    defaultValues: {
+      make: "",
+      model: "",
+      year: new Date().getFullYear(),
+      color: "",
+      price: 0,
+      vin: "",
+      status: "in_stock",
+      features: "",
+      imageUrl: "",
+      quantity: 1,
+    },
+  });
+  
+  const editForm = useForm<z.infer<typeof carSchema>>({
     resolver: zodResolver(carSchema),
     defaultValues: {
       make: "",
@@ -791,6 +809,31 @@ function InventoryTab() {
       });
     },
   });
+  
+  const updateCarMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof carSchema> & { id: number }) => {
+      const { id, ...carData } = data;
+      const res = await apiRequest("PUT", `/api/cars/${id}`, carData);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dealer/dashboard"] });
+      toast({
+        title: "Success",
+        description: "Car updated successfully.",
+      });
+      setIsEditDialogOpen(false);
+      setSelectedCar(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update car",
+        variant: "destructive",
+      });
+    },
+  });
 
   function onSubmit(values: z.infer<typeof carSchema>) {
     // Clone the values and process the restockDate
@@ -804,6 +847,43 @@ function InventoryTab() {
     
     addCarMutation.mutate(dataToSubmit);
   }
+  
+  function onEditSubmit(values: z.infer<typeof carSchema>) {
+    if (!selectedCar) return;
+    
+    // Clone the values and process the restockDate
+    const dataToSubmit = {
+      ...values,
+      id: selectedCar.id,
+      // Only include restockDate if specified and the status is out_of_stock
+      restockDate: values.status === 'out_of_stock' && values.restockDate 
+        ? values.restockDate 
+        : undefined
+    };
+    
+    updateCarMutation.mutate(dataToSubmit);
+  }
+  
+  const handleEditCar = (car: CarData) => {
+    setSelectedCar(car);
+    
+    // Set form default values from car data
+    editForm.reset({
+      make: car.make,
+      model: car.model,
+      year: car.year,
+      color: car.color,
+      price: car.price,
+      vin: car.vin,
+      status: car.status as any,
+      features: car.features || "",
+      imageUrl: car.imageUrl || "",
+      quantity: car.quantity,
+      restockDate: car.restockDate ? new Date(car.restockDate) : undefined
+    });
+    
+    setIsEditDialogOpen(true);
+  };
 
   const statusColors = {
     'in_stock': 'bg-green-100 text-green-800',
@@ -811,6 +891,214 @@ function InventoryTab() {
     'reserved': 'bg-yellow-100 text-yellow-800',
     'sold': 'bg-blue-100 text-blue-800',
   };
+  
+  // Common form fields component to reduce duplication
+  const CarFormFields = ({ formControl, formWatch, isSubmitting }: { 
+    formControl: any, 
+    formWatch: any,
+    isSubmitting: boolean
+  }) => (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={formControl}
+          name="make"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Make</FormLabel>
+              <FormControl>
+                <Input placeholder="Toyota" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={formControl}
+          name="model"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Model</FormLabel>
+              <FormControl>
+                <Input placeholder="Camry" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={formControl}
+          name="year"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Year</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  {...field}
+                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={formControl}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Color</FormLabel>
+              <FormControl>
+                <Input placeholder="Silver" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={formControl}
+          name="price"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Price ($)</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  {...field}
+                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={formControl}
+          name="vin"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>VIN</FormLabel>
+              <FormControl>
+                <Input placeholder="1HGCM82633A123456" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={formControl}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Select 
+                onValueChange={field.onChange}
+                defaultValue={field.value}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="in_stock">In Stock</SelectItem>
+                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                  <SelectItem value="reserved">Reserved</SelectItem>
+                  <SelectItem value="sold">Sold</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={formControl}
+          name="quantity"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Quantity</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  {...field}
+                  onChange={(e) => field.onChange(parseInt(e.target.value))}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      
+      <FormField
+        control={formControl}
+        name="features"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Features</FormLabel>
+            <FormControl>
+              <Input placeholder="Leather seats, sunroof, etc." {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
+      <FormField
+        control={formControl}
+        name="imageUrl"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Image URL</FormLabel>
+            <FormControl>
+              <Input placeholder="https://example.com/car-image.jpg" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
+      {formWatch("status") === "out_of_stock" && (
+        <FormField
+          control={formControl}
+          name="restockDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Restock Date</FormLabel>
+              <FormControl>
+                <Input 
+                  type="date" 
+                  {...field}
+                  value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
+                  onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      )}
+      
+      <DialogFooter>
+        <Button 
+          type="submit" 
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Saving..." : "Save Vehicle"}
+        </Button>
+      </DialogFooter>
+    </>
+  );
 
   return (
     <div className="space-y-4">
@@ -836,204 +1124,11 @@ function InventoryTab() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="make"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Make</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Toyota" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="model"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Model</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Camry" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="year"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Year</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="color"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Color</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Silver" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price ($)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="vin"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>VIN</FormLabel>
-                          <FormControl>
-                            <Input placeholder="1HGCM82633A123456" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="in_stock">In Stock</SelectItem>
-                              <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                              <SelectItem value="reserved">Reserved</SelectItem>
-                              <SelectItem value="sold">Sold</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="quantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="features"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Features</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Leather seats, sunroof, etc." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  <CarFormFields 
+                    formControl={form.control} 
+                    formWatch={form.watch} 
+                    isSubmitting={addCarMutation.isPending} 
                   />
-                  
-                  <FormField
-                    control={form.control}
-                    name="imageUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Image URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/car-image.jpg" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {form.watch("status") === "out_of_stock" && (
-                    <FormField
-                      control={form.control}
-                      name="restockDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Restock Date</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field}
-                              value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : ''}
-                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      disabled={addCarMutation.isPending}
-                    >
-                      {addCarMutation.isPending ? "Adding..." : "Add Vehicle"}
-                    </Button>
-                  </DialogFooter>
                 </form>
               </Form>
             </DialogContent>
@@ -1080,8 +1175,17 @@ function InventoryTab() {
                         <h3 className="font-bold text-lg">
                           {car.year} {car.make} {car.model}
                         </h3>
-                        <div className={`text-sm px-2 py-1 rounded ${statusColors[car.status as keyof typeof statusColors]}`}>
-                          {car.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        <div className="flex items-center gap-2">
+                          <div className={`text-sm px-2 py-1 rounded ${statusColors[car.status as keyof typeof statusColors]}`}>
+                            {car.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleEditCar(car)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-y-2 mt-2">
@@ -1111,6 +1215,27 @@ function InventoryTab() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Edit Car Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Edit Vehicle</DialogTitle>
+            <DialogDescription>
+              Update the vehicle information.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <CarFormFields 
+                formControl={editForm.control} 
+                formWatch={editForm.watch} 
+                isSubmitting={updateCarMutation.isPending} 
+              />
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
