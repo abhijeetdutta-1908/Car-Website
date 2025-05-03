@@ -861,11 +861,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate request body
       const carData = insertCarSchema.parse(req.body);
       
-      // Process the carData to ensure restockDate is handled correctly
-      const dataToInsert = {
-        ...carData,
-        restockDate: carData.restockDate ? new Date(carData.restockDate) : null
-      };
+      // The carData.restockDate is already processed by the schema validation
+      // No additional date conversion needed
+      const dataToInsert = carData;
       
       // Insert the car
       const [newCar] = await db.insert(cars).values(dataToInsert).returning();
@@ -915,7 +913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           features: carData.features,
           imageUrl: carData.imageUrl,
           quantity: carData.quantity,
-          restockDate: carData.restockDate ? new Date(carData.restockDate) : null,
+          restockDate: carData.restockDate,
           updatedAt: new Date()
         })
         .where(eq(cars.id, carId))

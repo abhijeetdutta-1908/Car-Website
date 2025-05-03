@@ -187,7 +187,11 @@ export const insertCarSchema = createInsertSchema(cars)
     status: z.enum(['in_stock', 'out_of_stock', 'reserved', 'sold']).optional(),
     features: z.string().optional(),
     imageUrl: z.string().optional(),
-    restockDate: z.date().optional(),
+    restockDate: z.union([
+      z.string().transform((val) => val ? new Date(val) : undefined),
+      z.date(),
+      z.undefined()
+    ]).optional(),
     quantity: z.number().int().min(0, "Quantity must be a positive integer").default(1),
   })
   .omit({
