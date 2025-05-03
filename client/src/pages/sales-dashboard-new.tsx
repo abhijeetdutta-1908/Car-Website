@@ -736,6 +736,7 @@ function InventoryTab() {
 
 function OrdersTab() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
@@ -752,10 +753,9 @@ function OrdersTab() {
     queryKey: ["/api/customers"],
   });
 
-  // Fetch in-stock cars for selection
+  // Fetch all cars for selection
   const { data: cars } = useQuery<any[]>({
     queryKey: ["/api/cars"],
-    select: (data) => data.filter(car => car.status === 'in_stock'),
   });
 
   // Create order mutation
@@ -796,14 +796,15 @@ function OrdersTab() {
   };
 
   const handleCreateOrder = () => {
-    if (!selectedCustomerId || !selectedCarId) return;
+    if (!selectedCustomerId || !selectedCarId || !user) return;
     
     const selectedCar = cars?.find(car => car.id === selectedCarId);
     
     createOrderMutation.mutate({
       customerId: selectedCustomerId,
       carId: selectedCarId,
-      totalAmount: selectedCar?.price || 0,
+      salesPersonId: user.id,
+      totalAmount: Number(selectedCar?.price || 0),
       notes: "",
     });
   };
@@ -942,19 +943,34 @@ function OrdersTab() {
               <div className="max-h-[300px] overflow-y-auto border rounded-md">
                 {cars && cars.length > 0 ? (
                   <div className="divide-y">
-                    {cars.map((car) => (
-                      <div 
-                        key={car.id} 
-                        className={`p-3 cursor-pointer hover:bg-muted transition-colors ${selectedCarId === car.id ? 'bg-muted' : ''}`}
-                        onClick={() => setSelectedCarId(car.id)}
-                      >
-                        <div className="font-medium">{car.make} {car.model} ({car.year})</div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">{car.color} • VIN: {car.vin}</span>
-                          <span className="font-medium">${Number(car.price).toLocaleString()}</span>
+                    {cars.map((car) => {
+                      const isOutOfStock = car.status === 'out_of_stock';
+                      return (
+                        <div 
+                          key={car.id} 
+                          className={`p-3 cursor-pointer hover:bg-muted transition-colors ${selectedCarId === car.id ? 'bg-muted' : ''} ${isOutOfStock ? 'opacity-60' : ''}`}
+                          onClick={() => !isOutOfStock && setSelectedCarId(car.id)}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="font-medium">{car.make} {car.model} ({car.year})</div>
+                            {isOutOfStock && (
+                              <Badge variant="outline" className="text-red-500 border-red-200">
+                                Out of Stock
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex justify-between mt-1">
+                            <span className="text-sm text-muted-foreground">{car.color} • VIN: {car.vin}</span>
+                            <span className="font-medium">${Number(car.price).toLocaleString()}</span>
+                          </div>
+                          {isOutOfStock && car.restockDate && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Expected restock: {new Date(car.restockDate).toLocaleDateString()}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="p-4 text-center text-muted-foreground">
