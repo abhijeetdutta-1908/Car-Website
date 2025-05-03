@@ -7,12 +7,14 @@ import {
   cars, 
   orders, 
   salesTargets, 
+  users,
   insertCustomerSchema, 
   insertCarSchema, 
   insertOrderSchema,
-  insertSalesTargetSchema
+  insertSalesTargetSchema,
+  insertUserSchema
 } from "../shared/schema";
-import { eq, desc, like, and, or, sql } from "drizzle-orm";
+import { eq, desc, like, and, or, sql, gte, lte, inArray } from "drizzle-orm";
 
 // Middleware to check authentication
 const isAuthenticated = (req: Request, res: Response, next: Function) => {
