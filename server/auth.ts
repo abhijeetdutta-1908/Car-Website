@@ -79,7 +79,9 @@ export function setupAuth(app: Express) {
             return done(null, false, { message: "Invalid email or password" });
           }
           
-          return done(null, user);
+          // Strip password before returning to passport
+          const { password: _, ...userWithoutPassword } = user;
+          return done(null, userWithoutPassword);
         } catch (error) {
           return done(error);
         }
@@ -125,11 +127,11 @@ export function setupAuth(app: Express) {
       });
 
       // Log the user in
-      req.login(user, (err) => {
+      const { password, ...userWithoutPassword } = user;
+      req.login(userWithoutPassword, (err) => {
         if (err) return next(err);
         
         // Return user without password
-        const { password, ...userWithoutPassword } = user;
         res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
