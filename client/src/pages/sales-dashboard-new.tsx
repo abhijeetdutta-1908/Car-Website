@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, UserRound, Car, ShoppingCart, ChevronRight, PlusCircle, BarChart3, CalendarClock, DollarSign, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Dialog,
@@ -734,6 +735,7 @@ function InventoryTab() {
 }
 
 function OrdersTab() {
+  const { toast } = useToast();
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [selectedCarId, setSelectedCarId] = useState<number | null>(null);
@@ -752,23 +754,37 @@ function OrdersTab() {
 
   // Fetch in-stock cars for selection
   const { data: cars } = useQuery<any[]>({
-    queryKey: ["/api/cars", { status: "in_stock" }],
+    queryKey: ["/api/cars"],
+    select: (data) => data.filter(car => car.status === 'in_stock'),
   });
 
   // Create order mutation
   const createOrderMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/orders", data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to create order");
+      }
       return await res.json();
     },
     onSuccess: () => {
       queryClientInstance.invalidateQueries({ queryKey: ["/api/orders"] });
       queryClientInstance.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClientInstance.invalidateQueries({ queryKey: ["/api/sales/dashboard"] });
+      toast({
+        title: "Success",
+        description: "Order created successfully",
+      });
       setIsCreateOrderOpen(false);
       resetOrderForm();
     },
-    onError: (error) => {
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create order",
+        variant: "destructive",
+      });
       console.error("Error creating order:", error);
     },
   });
