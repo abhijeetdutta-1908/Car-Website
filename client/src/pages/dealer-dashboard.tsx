@@ -225,7 +225,11 @@ function OverviewTab({ salesStaffCount = 0, maxSalesStaff = 5, isLoading = false
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-4">
-            <Card className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => document.getElementById('inventory-tab')?.click()}>
+            <Card 
+              className="hover:bg-gray-50 cursor-pointer transition-colors" 
+              onClick={() => document.getElementById('inventory-tab')?.click()}
+              data-testid="inventory-shortcut"
+            >
               <CardContent className="p-4 flex items-start space-x-3">
                 <Car className="h-5 w-5 mt-0.5 text-blue-500" />
                 <div>
@@ -234,7 +238,21 @@ function OverviewTab({ salesStaffCount = 0, maxSalesStaff = 5, isLoading = false
                 </div>
               </CardContent>
             </Card>
-            <Card className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => document.getElementById('performance-tab')?.click()}>
+            <Card 
+              className="hover:bg-gray-50 cursor-pointer transition-colors" 
+              onClick={() => {
+                const tabElement = document.getElementById('performance-tab');
+                tabElement?.click();
+                // Open the set target dialog after a small delay to ensure tab is activated
+                setTimeout(() => {
+                  const setTargetButton = document.querySelector('[data-target-button="true"]');
+                  if (setTargetButton instanceof HTMLElement) {
+                    setTargetButton.click();
+                  }
+                }, 100);
+              }}
+              data-testid="set-targets-shortcut"
+            >
               <CardContent className="p-4 flex items-start space-x-3">
                 <Target className="h-5 w-5 mt-0.5 text-red-500" />
                 <div>
@@ -243,7 +261,11 @@ function OverviewTab({ salesStaffCount = 0, maxSalesStaff = 5, isLoading = false
                 </div>
               </CardContent>
             </Card>
-            <Card className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => document.getElementById('performance-tab')?.click()}>
+            <Card 
+              className="hover:bg-gray-50 cursor-pointer transition-colors" 
+              onClick={() => document.getElementById('performance-tab')?.click()}
+              data-testid="reports-shortcut"
+            >
               <CardContent className="p-4 flex items-start space-x-3">
                 <BarChart className="h-5 w-5 mt-0.5 text-green-500" />
                 <div>
@@ -252,11 +274,15 @@ function OverviewTab({ salesStaffCount = 0, maxSalesStaff = 5, isLoading = false
                 </div>
               </CardContent>
             </Card>
-            <Card className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => document.getElementById('sales-staff-tab')?.click()}>
+            <Card 
+              className="hover:bg-gray-50 cursor-pointer transition-colors" 
+              onClick={() => document.getElementById('sales-staff-tab')?.click()}
+              data-testid="sales-staff-shortcut"
+            >
               <CardContent className="p-4 flex items-start space-x-3">
                 <Users className="h-5 w-5 mt-0.5 text-purple-500" />
                 <div>
-                  <h3 className="font-medium">Sales Staff</h3>
+                  <h3 className="font-medium">Sales Staff ({dashboardData?.stats?.salesStaffCount || 0}/{dashboardData?.stats?.maxSalesStaff || 5})</h3>
                   <p className="text-sm text-gray-500">Manage your sales team members</p>
                 </div>
               </CardContent>
@@ -549,7 +575,12 @@ function PerformanceTab() {
           </div>
           <Dialog open={isTargetDialogOpen} onOpenChange={setIsTargetDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="flex items-center gap-1">
+              <Button 
+                size="sm" 
+                className="flex items-center gap-1"
+                data-target-button="true"
+                data-testid="set-target-btn"
+              >
                 <Target className="h-4 w-4" />
                 Set Target
               </Button>

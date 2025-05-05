@@ -873,7 +873,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dealer/sales-targets", isAuthenticated, hasRole("dealer"), async (req, res) => {
     try {
       const dealerId = req.user!.id;
-      const targetData = insertSalesTargetSchema.parse(req.body);
+      
+      // Parse the target data with custom transformation
+      let targetData = req.body;
+      
+      // Make sure targetMonth is properly formatted as a date
+      if (targetData.targetMonth && !(targetData.targetMonth instanceof Date)) {
+        try {
+          // If targetMonth is a string in ISO format (from client)
+          targetData.targetMonth = new Date(targetData.targetMonth);
+        } catch (e) {
+          return res.status(400).json({ 
+            message: "Invalid date format for target month",
+            error: "Please provide a valid date" 
+          });
+        }
+      }
+      
+      // Validate the data using our schema
+      targetData = insertSalesTargetSchema.parse(targetData);
       
       // Check if salesperson belongs to this dealer
       const salesPerson = await db.select()
@@ -889,10 +907,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "The sales person doesn't belong to your dealership" });
       }
       
+      // Format date correctly for PostgreSQL
+      const formattedDate = targetData.targetMonth.toISOString().split('T')[0];
+      
       // Insert sales target
       const [newTarget] = await db.insert(salesTargets).values({
-        ...targetData,
-        targetMonth: new Date(targetData.targetMonth)
+        salesPersonId: targetData.salesPersonId,
+        targetMonth: formattedDate,
+        revenueTarget: targetData.revenueTarget,
+        unitsTarget: targetData.unitsTarget
       }).returning();
       
       res.status(201).json(newTarget);
