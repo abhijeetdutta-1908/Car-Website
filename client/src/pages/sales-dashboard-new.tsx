@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, UserRound, Car, ShoppingCart, ChevronRight, PlusCircle, BarChart3, CalendarClock, DollarSign, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -183,8 +184,49 @@ function QuickLinksCard() {
 }
 
 function ActionButton({ icon, label }: { icon: React.ReactNode, label: string }) {
+  const [activeTab, setActiveTab] = useState("overview");
+  const setGlobalActiveTab = useContext(TabContext);
+  
+  const handleClick = () => {
+    // Navigate to appropriate tab based on button label
+    switch (label) {
+      case "Add Customer":
+        setGlobalActiveTab("customers");
+        setTimeout(() => {
+          // Find and click the "New Customer" button
+          const addCustomerBtn = document.querySelector('[data-testid="add-customer-btn"]');
+          if (addCustomerBtn instanceof HTMLElement) {
+            addCustomerBtn.click();
+          }
+        }, 100);
+        break;
+      case "New Order":
+        setGlobalActiveTab("orders");
+        setTimeout(() => {
+          // Find and click the "New Order" button
+          const newOrderBtn = document.querySelector('[data-testid="new-order-btn"]');
+          if (newOrderBtn instanceof HTMLElement) {
+            newOrderBtn.click();
+          }
+        }, 100);
+        break;
+      case "View Inventory":
+        setGlobalActiveTab("inventory");
+        break;
+      case "Schedule Follow-up":
+        setGlobalActiveTab("customers");
+        break;
+      default:
+        break;
+    }
+  };
+  
   return (
-    <Button variant="outline" className="h-auto flex items-center justify-start py-3 px-4 space-x-2 w-full">
+    <Button 
+      variant="outline" 
+      className="h-auto flex items-center justify-start py-3 px-4 space-x-2 w-full"
+      onClick={handleClick}
+    >
       <div className="flex-shrink-0">{icon}</div>
       <span>{label}</span>
     </Button>

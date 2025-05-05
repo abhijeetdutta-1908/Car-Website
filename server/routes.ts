@@ -257,6 +257,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error fetching dashboard data" });
     }
   });
+  
+  // Get sales performance data (for the detailed performance tab)
+  app.get("/api/sales/performance", isAuthenticated, hasRole("sales"), async (req, res) => {
+    try {
+      const salesId = req.user!.id;
+      
+      // Get current date info for monthly calculations
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+      const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+      
+      // Get total sales count and revenue
+      const totalSalesResult = await db.execute(sql`
+        SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue
+        FROM orders 
+        WHERE sales_person_id = ${salesId}
+      `);
+      
+      const totalSales = parseInt(totalSalesResult.rows[0]?.count || '0', 10);
+      const totalRevenue = parseFloat(totalSalesResult.rows[0]?.revenue || '0');
+      
+      // Get monthly sales count and revenue
+      const monthlySalesResult = await db.execute(sql`
+        SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue
+        FROM orders 
+        WHERE sales_person_id = ${salesId}
+        AND order_date >= ${firstDayOfMonth} 
+        AND order_date <= ${lastDayOfMonth}
+      `);
+      
+      const monthlySales = parseInt(monthlySalesResult.rows[0]?.count || '0', 10);
+      const monthlyRevenue = parseFloat(monthlySalesResult.rows[0]?.revenue || '0');
+      
+      // Get current month target
+      const targetMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+      const targetResult = await db.execute(sql`
+        SELECT * FROM sales_targets 
+        WHERE sales_person_id = ${salesId} 
+        AND target_month = ${targetMonth}
+      `);
+      
+      let target = null;
+      if (targetResult.rows.length > 0) {
+        target = {
+          id: targetResult.rows[0].id,
+          revenueTarget: parseFloat(targetResult.rows[0].revenue_target),
+          unitsTarget: parseInt(targetResult.rows[0].units_target, 10)
+        };
+      }
+      
+      // Get recent sales with more details
+      const recentSalesResult = await db.execute(sql`
+        SELECT o.id, o.order_date, o.total_amount as amount,
+               CONCAT(c.first_name, ' ', c.last_name) as customer_name,
+               CONCAT(ca.make, ' ', ca.model, ' (', ca.year, ')') as car_details
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.id
+        JOIN cars ca ON o.car_id = ca.id
+        WHERE o.sales_person_id = ${salesId}
+        ORDER BY o.order_date DESC
+        LIMIT 5
+      `);
+      
+      // Response with performance data
+      res.json({
+        totalSales,
+        totalRevenue,
+        monthlySales,
+        monthlyRevenue,
+        target,
+        recentSales: recentSalesResult.rows
+      });
+    } catch (error) {
+      console.error("Error fetching sales performance data:", error);
+      res.status(500).json({ message: "Error fetching performance data" });
+    }
+  });
 
   // === CUSTOMER API ENDPOINTS ===
   
