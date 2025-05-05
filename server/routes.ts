@@ -655,8 +655,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dealerId: dealerId
       });
       
-      // Create the user
-      const [newUser] = await db.insert(users).values(userData).returning({
+      // Hash the password
+      const { hashPassword } = await import('./auth');
+      const hashedPassword = await hashPassword(userData.password);
+      
+      // Create the user with hashed password
+      const [newUser] = await db.insert(users).values({
+        ...userData,
+        password: hashedPassword
+      }).returning({
         id: users.id,
         username: users.username,
         email: users.email,

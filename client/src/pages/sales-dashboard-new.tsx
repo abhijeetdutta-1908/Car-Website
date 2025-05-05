@@ -1043,6 +1043,32 @@ function OrdersTab() {
 }
 
 function PerformanceTab() {
+  const [showFullReport, setShowFullReport] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // Fetch performance data
+  const { data: performanceData, isLoading } = useQuery<any>({
+    queryKey: ["/api/sales/performance"],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", "/api/sales/performance");
+        if (!res.ok) {
+          throw new Error("Failed to fetch performance data");
+        }
+        return await res.json();
+      } catch (error) {
+        console.error("Error fetching performance data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load performance data",
+          variant: "destructive",
+        });
+        return null;
+      }
+    }
+  });
+  
   return (
     <Card>
       <CardHeader>
@@ -1052,14 +1078,133 @@ function PerformanceTab() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-10 text-muted-foreground">
-          <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">Sales Analytics</h3>
-          <p className="max-w-md mx-auto mb-6">
-            View detailed statistics about your sales performance, including monthly targets, conversion rates, and historical trends.
-          </p>
-          <Button variant="outline">View Full Report</Button>
-        </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-10 w-48 mx-auto" />
+          </div>
+        ) : showFullReport && performanceData ? (
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Sales Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Sales</span>
+                      <span className="font-medium">{performanceData.totalSales || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Monthly Sales</span>
+                      <span className="font-medium">{performanceData.monthlySales || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Revenue</span>
+                      <span className="font-medium">${Number(performanceData.totalRevenue || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Monthly Revenue</span>
+                      <span className="font-medium">${Number(performanceData.monthlyRevenue || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Monthly Targets</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {performanceData.target ? (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Revenue Target</span>
+                          <span className="text-sm">{performanceData.monthlyRevenue || 0} / {performanceData.target.revenueTarget}</span>
+                        </div>
+                        <Progress 
+                          value={Math.min(
+                            ((performanceData.monthlyRevenue || 0) / performanceData.target.revenueTarget) * 100, 
+                            100
+                          )} 
+                          className="h-2"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-muted-foreground">Units Target</span>
+                          <span className="text-sm">{performanceData.monthlySales || 0} / {performanceData.target.unitsTarget}</span>
+                        </div>
+                        <Progress 
+                          value={Math.min(
+                            ((performanceData.monthlySales || 0) / performanceData.target.unitsTarget) * 100, 
+                            100
+                          )} 
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-center text-sm text-muted-foreground py-4">
+                      No targets set for this month
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            <h3 className="text-lg font-medium mt-6">Recent Sales</h3>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Car</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {performanceData.recentSales && performanceData.recentSales.length > 0 ? (
+                    performanceData.recentSales.map((sale: any) => (
+                      <TableRow key={sale.id}>
+                        <TableCell>{new Date(sale.orderDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{sale.customerName}</TableCell>
+                        <TableCell>{sale.carDetails}</TableCell>
+                        <TableCell className="text-right">${Number(sale.amount).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                        No recent sales
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            
+            <div className="flex justify-center mt-6">
+              <Button variant="outline" onClick={() => setShowFullReport(false)}>
+                Hide Full Report
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Sales Analytics</h3>
+            <p className="max-w-md mx-auto mb-6">
+              View detailed statistics about your sales performance, including monthly targets, conversion rates, and historical trends.
+            </p>
+            <Button variant="outline" onClick={() => setShowFullReport(true)}>
+              View Full Report
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
