@@ -57,6 +57,9 @@ const customerFormSchema = z.object({
 
 type CustomerFormValues = z.infer<typeof customerFormSchema>;
 
+// Create context for tab management
+const TabContext = createContext<(tab: string) => void>(() => {});
+
 export default function SalesDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const { user } = useAuth();
@@ -77,87 +80,93 @@ export default function SalesDashboard() {
 
   return (
     <DashboardLayout title="Sales Dashboard">
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-semibold">
-              {isLoading ? (
-                <Skeleton className="h-7 w-96" />
-              ) : (
-                data?.message || `Welcome back, ${user?.username || "Sales Agent"}!`
-              )}
-            </h2>
-            <p className="text-muted-foreground">Your sales dashboard and management tools</p>
-          </div>
-          <Button size="sm">
-            <PlusCircle className="h-4 w-4 mr-2" />
-            New Customer
-          </Button>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          <StatCard
-            title="Daily Sales"
-            value={data?.stats.dailySales}
-            icon={<LineChart className="h-6 w-6" />}
-            color="bg-blue-500"
-            isLoading={isLoading}
-          />
-          <StatCard
-            title="Leads Generated"
-            value={data?.stats.leadsGenerated}
-            icon={<UserRound className="h-6 w-6" />}
-            color="bg-orange-500"
-            isLoading={isLoading}
-          />
-          <StatCard
-            title="Conversion Rate"
-            valueText={data?.stats.conversionRate}
-            icon={<TrendingUp className="h-6 w-6" />}
-            color="bg-green-500"
-            isLoading={isLoading}
-          />
-        </div>
-
-        <Tabs
-          defaultValue="overview"
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="space-y-4"
-        >
-          <TabsList className="bg-card border">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="customers">Customers</TabsTrigger>
-            <TabsTrigger value="inventory">Car Inventory</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <QuickLinksCard />
-              <RecentActivitiesCard />
+      <TabContext.Provider value={setActiveTab}>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-semibold">
+                {isLoading ? (
+                  <Skeleton className="h-7 w-96" />
+                ) : (
+                  data?.message || `Welcome back, ${user?.username || "Sales Agent"}!`
+                )}
+              </h2>
+              <p className="text-muted-foreground">Your sales dashboard and management tools</p>
             </div>
-            <MonthlyTargetsCard />
-          </TabsContent>
-          
-          <TabsContent value="customers" className="space-y-4">
-            <CustomersTab />
-          </TabsContent>
-          
-          <TabsContent value="inventory" className="space-y-4">
-            <InventoryTab />
-          </TabsContent>
-          
-          <TabsContent value="orders" className="space-y-4">
-            <OrdersTab />
-          </TabsContent>
-          
-          <TabsContent value="performance" className="space-y-4">
-            <PerformanceTab />
-          </TabsContent>
-        </Tabs>
-      </div>
+            <Button 
+              size="sm" 
+              onClick={() => setActiveTab("customers")}
+              data-testid="add-customer-btn"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Customer
+            </Button>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <StatCard
+              title="Daily Sales"
+              value={data?.stats.dailySales}
+              icon={<LineChart className="h-6 w-6" />}
+              color="bg-blue-500"
+              isLoading={isLoading}
+            />
+            <StatCard
+              title="Leads Generated"
+              value={data?.stats.leadsGenerated}
+              icon={<UserRound className="h-6 w-6" />}
+              color="bg-orange-500"
+              isLoading={isLoading}
+            />
+            <StatCard
+              title="Conversion Rate"
+              valueText={data?.stats.conversionRate}
+              icon={<TrendingUp className="h-6 w-6" />}
+              color="bg-green-500"
+              isLoading={isLoading}
+            />
+          </div>
+
+          <Tabs
+            defaultValue="overview"
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="space-y-4"
+          >
+            <TabsList className="bg-card border">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="customers">Customers</TabsTrigger>
+              <TabsTrigger value="inventory">Car Inventory</TabsTrigger>
+              <TabsTrigger value="orders">Orders</TabsTrigger>
+              <TabsTrigger value="performance">Performance</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <QuickLinksCard />
+                <RecentActivitiesCard />
+              </div>
+              <MonthlyTargetsCard />
+            </TabsContent>
+            
+            <TabsContent value="customers" className="space-y-4">
+              <CustomersTab />
+            </TabsContent>
+            
+            <TabsContent value="inventory" className="space-y-4">
+              <InventoryTab />
+            </TabsContent>
+            
+            <TabsContent value="orders" className="space-y-4">
+              <OrdersTab />
+            </TabsContent>
+            
+            <TabsContent value="performance" className="space-y-4">
+              <PerformanceTab />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </TabContext.Provider>
     </DashboardLayout>
   );
 }
@@ -872,7 +881,11 @@ function OrdersTab() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Order Management</CardTitle>
-          <Button size="sm" onClick={() => setIsCreateOrderOpen(true)}>
+          <Button 
+            size="sm" 
+            onClick={() => setIsCreateOrderOpen(true)}
+            data-testid="new-order-btn"
+          >
             <PlusCircle className="h-4 w-4 mr-2" />
             Create Order
           </Button>
