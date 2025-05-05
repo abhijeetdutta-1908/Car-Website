@@ -282,7 +282,7 @@ function OverviewTab({ salesStaffCount = 0, maxSalesStaff = 5, isLoading = false
               <CardContent className="p-4 flex items-start space-x-3">
                 <Users className="h-5 w-5 mt-0.5 text-purple-500" />
                 <div>
-                  <h3 className="font-medium">Sales Staff ({dashboardData?.stats?.salesStaffCount || 0}/{dashboardData?.stats?.maxSalesStaff || 5})</h3>
+                  <h3 className="font-medium">Sales Staff ({salesStaffCount || 0}/{maxSalesStaff || 5})</h3>
                   <p className="text-sm text-gray-500">Manage your sales team members</p>
                 </div>
               </CardContent>
