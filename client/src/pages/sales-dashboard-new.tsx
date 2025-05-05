@@ -1102,6 +1102,11 @@ function PerformanceTab() {
   const { user } = useAuth();
   const { toast } = useToast();
   
+  // Function to toggle full report view
+  const toggleFullReport = () => {
+    setShowFullReport(prev => !prev);
+  };
+  
   // Fetch performance data
   const { data: performanceData, isLoading } = useQuery<any>({
     queryKey: ["/api/sales/performance"],
@@ -1345,7 +1350,7 @@ function PerformanceTab() {
             </div>
             <div className="flex justify-center">
               <Button 
-                onClick={() => setShowFullReport(true)}
+                onClick={toggleFullReport}
                 data-testid="view-full-report-btn"
               >
                 <BarChart3 className="h-4 w-4 mr-2" />

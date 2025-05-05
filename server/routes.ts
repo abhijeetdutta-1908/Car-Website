@@ -780,7 +780,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Sales person not found" });
       }
       
-      // Delete the sales person
+      // First delete associated sales targets to avoid foreign key constraint
+      await db.delete(salesTargets)
+        .where(eq(salesTargets.salesPersonId, salesPersonId));
+        
+      // Then delete orders associated with this sales person
+      await db.delete(orders)
+        .where(eq(orders.salesPersonId, salesPersonId));
+        
+      // Now delete the sales person
       await db.delete(users)
         .where(eq(users.id, salesPersonId));
       
