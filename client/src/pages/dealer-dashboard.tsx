@@ -106,7 +106,7 @@ const carSchema = z.object({
 
 export default function DealerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
-  const { data, isLoading, error } = useQuery<DealerDashboardData>({
+  const { data: dashboardData, isLoading, error } = useQuery<DealerDashboardData>({
     queryKey: ["/api/dealer/dashboard"],
   });
   const { logoutMutation } = useAuth();
@@ -134,7 +134,7 @@ export default function DealerDashboard() {
           {isLoading ? (
             <Skeleton className="h-7 w-96" />
           ) : (
-            data?.message || "Welcome to the Dealer Dashboard"
+            dashboardData?.message || "Welcome to the Dealer Dashboard"
           )}
         </h2>
         <Button variant="outline" onClick={handleSignOut} className="flex items-center gap-2">
@@ -146,21 +146,21 @@ export default function DealerDashboard() {
       <div className="grid md:grid-cols-3 gap-6 mb-6">
         <StatCard
           title="Inventory Items"
-          value={data?.stats.inventory}
+          value={dashboardData?.stats.inventory}
           icon={<Package className="h-6 w-6" />}
           color="bg-purple-500"
           isLoading={isLoading}
         />
         <StatCard
           title="Pending Orders"
-          value={data?.stats.pendingOrders}
+          value={dashboardData?.stats.pendingOrders}
           icon={<Clock className="h-6 w-6" />}
           color="bg-yellow-500"
           isLoading={isLoading}
         />
         <StatCard
           title="Monthly Revenue"
-          valueText={data?.stats.monthlyRevenue}
+          valueText={dashboardData?.stats.monthlyRevenue}
           icon={<DollarSign className="h-6 w-6" />}
           color="bg-green-500"
           isLoading={isLoading}
@@ -176,7 +176,7 @@ export default function DealerDashboard() {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
-          <OverviewTab salesStaffCount={data?.stats.salesStaffCount} maxSalesStaff={data?.stats.maxSalesStaff} isLoading={isLoading} />
+          <OverviewTab salesStaffCount={dashboardData?.stats.salesStaffCount} maxSalesStaff={dashboardData?.stats.maxSalesStaff} isLoading={isLoading} />
         </TabsContent>
         
         <TabsContent value="sales-staff" className="space-y-4">
@@ -564,6 +564,18 @@ function PerformanceTab() {
   const calculateProgress = (current: number, target: number) => {
     return Math.min(Math.round((current / target) * 100), 100);
   };
+  
+  const getProgressColor = (current: number, target: number) => {
+    const percentage = (current / target) * 100;
+    
+    if (percentage < 50) {
+      return "bg-red-500";
+    } else if (percentage < 75) {
+      return "bg-yellow-500";
+    } else {
+      return "bg-green-500";
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -738,8 +750,9 @@ function PerformanceTab() {
                         </div>
                         {person.target && (
                           <Progress 
-                            className="mt-1" 
-                            value={calculateProgress(person.monthlySales, person.target.unitsTarget)} 
+                            className={`mt-1 ${getProgressColor(person.monthlySales, person.target.unitsTarget)}`} 
+                            value={calculateProgress(person.monthlySales, person.target.unitsTarget)}
+                            data-testid="units-progress" 
                           />
                         )}
                       </div>
@@ -755,8 +768,9 @@ function PerformanceTab() {
                         </div>
                         {person.target && (
                           <Progress 
-                            className="mt-1" 
-                            value={calculateProgress(person.monthlyRevenue, person.target.revenueTarget)} 
+                            className={`mt-1 ${getProgressColor(person.monthlyRevenue, person.target.revenueTarget)}`}
+                            value={calculateProgress(person.monthlyRevenue, person.target.revenueTarget)}
+                            data-testid="revenue-progress" 
                           />
                         )}
                       </div>
