@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LineChart, UserRound, Car, ShoppingCart, ChevronRight, PlusCircle, BarChart3, CalendarClock, DollarSign, Users, TrendingUp } from "lucide-react";
+import { LineChart, UserRound, Car, ShoppingCart, ChevronRight, ChevronDown, PlusCircle, BarChart3, CalendarClock, DollarSign, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1297,7 +1297,7 @@ function PerformanceTab() {
             <div className="flex justify-center mt-6">
               <Button 
                 variant="outline" 
-                onClick={() => setShowFullReport(false)}
+                onClick={toggleFullReport}
                 data-testid="hide-full-report-btn"
               >
                 <ChevronDown className="h-4 w-4 mr-2" />
@@ -1367,7 +1367,7 @@ function PerformanceTab() {
             </p>
             <Button 
               variant="outline" 
-              onClick={() => setShowFullReport(true)}
+              onClick={toggleFullReport}
               data-testid="view-full-report-btn"
             >
               View Full Report
