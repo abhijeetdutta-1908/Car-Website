@@ -1124,13 +1124,52 @@ function PerformanceTab() {
     }
   });
   
+  // Calculate percentages for visual indicators
+  const getPercentage = (current: number, target: number) => {
+    if (!target || target === 0) return 0;
+    return Math.min(Math.round((current / target) * 100), 100);
+  };
+
+  // Get status color based on percentage
+  const getStatusColor = (percentage: number) => {
+    if (percentage >= 90) return "text-green-500";
+    if (percentage >= 60) return "text-yellow-500";
+    return "text-red-500";
+  };
+
+  const revenuePercentage = performanceData?.target 
+    ? getPercentage(performanceData.monthlyRevenue || 0, performanceData.target.revenueTarget)
+    : 0;
+    
+  const unitsPercentage = performanceData?.target 
+    ? getPercentage(performanceData.monthlySales || 0, performanceData.target.unitsTarget)
+    : 0;
+  
+  const revenueStatusColor = getStatusColor(revenuePercentage);
+  const unitsStatusColor = getStatusColor(unitsPercentage);
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Performance Metrics</CardTitle>
-        <CardDescription>
-          Track your sales performance and achievements
-        </CardDescription>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>Performance Metrics</CardTitle>
+            <CardDescription>
+              Track your sales performance and achievements
+            </CardDescription>
+          </div>
+          {!isLoading && performanceData && !showFullReport && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowFullReport(true)}
+              data-testid="view-full-report-btn"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              View Full Report
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -1177,28 +1216,36 @@ function PerformanceTab() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-muted-foreground">Revenue Target</span>
-                          <span className="text-sm">{performanceData.monthlyRevenue || 0} / {performanceData.target.revenueTarget}</span>
+                          <span className="text-sm">
+                            <span className={revenueStatusColor}>
+                              ${Number(performanceData.monthlyRevenue || 0).toLocaleString()}
+                            </span> / ${Number(performanceData.target.revenueTarget).toLocaleString()}
+                          </span>
                         </div>
                         <Progress 
-                          value={Math.min(
-                            ((performanceData.monthlyRevenue || 0) / performanceData.target.revenueTarget) * 100, 
-                            100
-                          )} 
+                          value={revenuePercentage} 
                           className="h-2"
                         />
+                        <div className="text-right text-xs mt-1">
+                          <span className={revenueStatusColor}>{revenuePercentage}% completed</span>
+                        </div>
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-muted-foreground">Units Target</span>
-                          <span className="text-sm">{performanceData.monthlySales || 0} / {performanceData.target.unitsTarget}</span>
+                          <span className="text-sm">
+                            <span className={unitsStatusColor}>
+                              {performanceData.monthlySales || 0}
+                            </span> / {performanceData.target.unitsTarget}
+                          </span>
                         </div>
                         <Progress 
-                          value={Math.min(
-                            ((performanceData.monthlySales || 0) / performanceData.target.unitsTarget) * 100, 
-                            100
-                          )} 
+                          value={unitsPercentage} 
                           className="h-2"
                         />
+                        <div className="text-right text-xs mt-1">
+                          <span className={unitsStatusColor}>{unitsPercentage}% completed</span>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1243,8 +1290,66 @@ function PerformanceTab() {
             </div>
             
             <div className="flex justify-center mt-6">
-              <Button variant="outline" onClick={() => setShowFullReport(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowFullReport(false)}
+                data-testid="hide-full-report-btn"
+              >
+                <ChevronDown className="h-4 w-4 mr-2" />
                 Hide Full Report
+              </Button>
+            </div>
+          </div>
+        ) : performanceData ? (
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-md border p-4">
+                <h3 className="text-sm font-medium mb-2">Monthly Stats</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold">{performanceData.monthlySales || 0}</div>
+                    <div className="text-xs text-muted-foreground">Cars Sold</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold">${Number(performanceData.monthlyRevenue || 0).toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">Revenue</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="rounded-md border p-4">
+                <h3 className="text-sm font-medium mb-2">Target Progress</h3>
+                {performanceData.target ? (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>Revenue</span>
+                        <span className={revenueStatusColor}>{revenuePercentage}%</span>
+                      </div>
+                      <Progress value={revenuePercentage} className="h-1.5" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>Units</span>
+                        <span className={unitsStatusColor}>{unitsPercentage}%</span>
+                      </div>
+                      <Progress value={unitsPercentage} className="h-1.5" />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-center text-sm text-muted-foreground py-2">
+                    No targets set
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <Button 
+                onClick={() => setShowFullReport(true)}
+                data-testid="view-full-report-btn"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Full Report
               </Button>
             </div>
           </div>
@@ -1255,7 +1360,11 @@ function PerformanceTab() {
             <p className="max-w-md mx-auto mb-6">
               View detailed statistics about your sales performance, including monthly targets, conversion rates, and historical trends.
             </p>
-            <Button variant="outline" onClick={() => setShowFullReport(true)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowFullReport(true)}
+              data-testid="view-full-report-btn"
+            >
               View Full Report
             </Button>
           </div>
