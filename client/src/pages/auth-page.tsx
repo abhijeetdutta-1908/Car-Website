@@ -335,7 +335,7 @@ export default function AuthPage() {
 
         {/* Footer Information */}
         <footer className="text-center text-gray-500 text-xs mt-8">
-          <p>&copy; 2023 SecureAuth. All rights reserved.</p>
+          <p>&copy; 2025 Moto Verse. All rights reserved.</p>
         </footer>
       </main>
     </div>
