@@ -57,12 +57,14 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
       {/* Sidebar */}
       <div className="bg-white shadow-md w-64 min-h-screen flex flex-col border-r">
         <div className="p-4 border-b flex items-center gap-3">
-          <div className="p-2 bg-primary-50 rounded-lg">{getRoleIcon()}</div>
+          <div className="flex-shrink-0">
+            <img src="/moto-verse-icon.svg" alt="Moto Verse Logo" className="h-10 w-10" />
+          </div>
           <div>
             <h1 className="font-bold text-lg text-primary-800 capitalize">
               {user?.role} Portal
             </h1>
-            <p className="text-sm text-gray-500">SecureAuth System</p>
+            <p className="text-sm text-gray-500">Moto Verse</p>
           </div>
         </div>
         
@@ -117,7 +119,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         <main className="flex-1 p-6 bg-gray-50">{children}</main>
         
         <footer className="bg-white p-4 border-t text-center text-sm text-gray-500">
-          &copy; 2023 SecureAuth. All rights reserved.
+          &copy; 2025 Moto Verse. All rights reserved.
         </footer>
       </div>
     </div>

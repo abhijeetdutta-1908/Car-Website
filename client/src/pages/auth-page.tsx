@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RoleSelector } from "@/components/ui/role-selector";
-import { Shield } from "lucide-react";
+import { Car } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -88,11 +88,14 @@ export default function AuthPage() {
       <main className="w-full max-w-md">
         {/* App Logo/Branding */}
         <div className="text-center mb-10">
+          <div className="flex justify-center mb-4">
+            <img src="/moto-verse-logo.svg" alt="Moto Verse Logo" className="h-20 w-20" />
+          </div>
           <h1 className="text-3xl font-bold text-primary-600 flex items-center justify-center">
-            <Shield className="mr-2 h-6 w-6" />
-            SecureAuth
+            <Car className="mr-2 h-6 w-6" />
+            Moto Verse
           </h1>
-          <p className="text-gray-600 mt-2">Role-based authentication system</p>
+          <p className="text-gray-600 mt-2">Premium automotive management system</p>
         </div>
 
         {/* Login Form */}

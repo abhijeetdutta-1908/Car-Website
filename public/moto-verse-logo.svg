@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="256" fill="#0F172A"/>
+  <path d="M391 291.5C391 301.717 382.717 310 372.5 310H139.5C129.283 310 121 301.717 121 291.5C121 281.283 129.283 273 139.5 273H372.5C382.717 273 391 281.283 391 291.5Z" fill="#3B82F6"/>
+  <path d="M356.5 225C356.5 235.217 348.217 243.5 338 243.5H174C163.783 243.5 155.5 235.217 155.5 225C155.5 214.783 163.783 206.5 174 206.5H338C348.217 206.5 356.5 214.783 356.5 225Z" fill="#3B82F6"/>
+  <rect x="155.5" y="225" width="201" height="66.5" rx="20" fill="#3B82F6"/>
+  <circle cx="165.5" cy="291.5" r="25.5" fill="#1E293B" stroke="#3B82F6" stroke-width="6"/>
+  <circle cx="346.5" cy="291.5" r="25.5" fill="#1E293B" stroke="#3B82F6" stroke-width="6"/>
+  <path d="M165.5 273C157.492 273 151 279.492 151 287.5C151 295.508 157.492 302 165.5 302C173.508 302 180 295.508 180 287.5C180 279.492 173.508 273 165.5 273ZM346.5 273C338.492 273 332 279.492 332 287.5C332 295.508 338.492 302 346.5 302C354.508 302 361 295.508 361 287.5C361 279.492 354.508 273 346.5 273Z" fill="#94A3B8"/>
+  <path d="M156 180L187 220" stroke="#3B82F6" stroke-width="6" stroke-linecap="round"/>
+  <path d="M356 180L325 220" stroke="#3B82F6" stroke-width="6" stroke-linecap="round"/>
+  <path d="M160 340H352" stroke="#3B82F6" stroke-width="6" stroke-linecap="round"/>
+  <path d="M203 170H309" stroke="#3B82F6" stroke-width="6" stroke-linecap="round"/>
+  <path d="M144 370C144 364.477 148.477 360 154 360H358C363.523 360 368 364.477 368 370V370C368 375.523 363.523 380 358 380H154C148.477 380 144 375.523 144 370V370Z" fill="#3B82F6"/>
+  <text x="256" y="130" font-family="Arial, sans-serif" font-size="36" fill="#FFFFFF" text-anchor="middle" font-weight="bold">MOTO VERSE</text>
+</svg>
