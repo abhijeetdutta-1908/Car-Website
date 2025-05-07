@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, uniqueIndex, integer, decimal, varchar, pgEnum, date } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, timestamp, unique, decimal, date, mysqlEnum } from "drizzle-orm/mysql-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
@@ -12,88 +12,90 @@ export const UserRole = {
 
 export type UserRole = typeof UserRole[keyof typeof UserRole];
 
-// Define car status enum
-export const carStatusEnum = pgEnum('car_status', ['in_stock', 'out_of_stock', 'reserved', 'sold']);
+// Define car status values (MySQL doesn't support direct enums like PostgreSQL)
+export const carStatusValues = ['in_stock', 'out_of_stock', 'reserved', 'sold'] as const;
+export type CarStatus = typeof carStatusValues[number];
 
-// Define order status enum
-export const orderStatusEnum = pgEnum('order_status', ['pending', 'confirmed', 'delivered', 'cancelled']);
+// Define order status values
+export const orderStatusValues = ['pending', 'confirmed', 'delivered', 'cancelled'] as const;
+export type OrderStatus = typeof orderStatusValues[number];
 
 // Define users table
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role").notNull().$type<UserRole>(),
-  dealerId: integer("dealer_id"),
-  profilePicture: text("profile_picture"),
-  phoneNumber: text("phone_number"),
+export const users = mysqlTable("users", {
+  id: int("id").primaryKey().autoincrement(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).notNull(),
+  dealerId: int("dealer_id"),
+  profilePicture: varchar("profile_picture", { length: 255 }),
+  phoneNumber: varchar("phone_number", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    emailIdx: uniqueIndex("email_idx").on(table.email),
-    usernameIdx: uniqueIndex("username_idx").on(table.username),
+    emailIdx: unique("email_idx").on(table.email),
+    usernameIdx: unique("username_idx").on(table.username),
   };
 });
 
 // Define customers table
-export const customers = pgTable("customers", {
-  id: serial("id").primaryKey(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  email: text("email").notNull(),
-  phone: text("phone"),
-  address: text("address"),
-  notes: text("notes"),
-  salesPersonId: integer("sales_person_id").references(() => users.id),
+export const customers = mysqlTable("customers", {
+  id: int("id").primaryKey().autoincrement(),
+  firstName: varchar("first_name", { length: 255 }).notNull(),
+  lastName: varchar("last_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  address: varchar("address", { length: 255 }),
+  notes: varchar("notes", { length: 1000 }),
+  salesPersonId: int("sales_person_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => {
   return {
-    customerEmailIdx: uniqueIndex("customer_email_idx").on(table.email),
+    customerEmailIdx: unique("customer_email_idx").on(table.email),
   };
 });
 
 // Define cars table
-export const cars = pgTable("cars", {
-  id: serial("id").primaryKey(),
-  make: text("make").notNull(),
-  model: text("model").notNull(),
-  year: integer("year").notNull(),
-  color: text("color").notNull(),
+export const cars = mysqlTable("cars", {
+  id: int("id").primaryKey().autoincrement(),
+  make: varchar("make", { length: 255 }).notNull(),
+  model: varchar("model", { length: 255 }).notNull(),
+  year: int("year").notNull(),
+  color: varchar("color", { length: 50 }).notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  vin: text("vin").notNull(),
-  status: text("status").default('in_stock').notNull(),
-  features: text("features"),
-  imageUrl: text("image_url"),
+  vin: varchar("vin", { length: 50 }).notNull(),
+  status: mysqlEnum("status", carStatusValues).default('in_stock').notNull(),
+  features: varchar("features", { length: 1000 }),
+  imageUrl: varchar("image_url", { length: 255 }),
   restockDate: date("restock_date"),
-  quantity: integer("quantity").default(1).notNull(),
+  quantity: int("quantity").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Define orders table
-export const orders = pgTable("orders", {
-  id: serial("id").primaryKey(),
-  customerId: integer("customer_id").notNull().references(() => customers.id),
-  carId: integer("car_id").notNull().references(() => cars.id),
-  salesPersonId: integer("sales_person_id").notNull().references(() => users.id),
+export const orders = mysqlTable("orders", {
+  id: int("id").primaryKey().autoincrement(),
+  customerId: int("customer_id").notNull().references(() => customers.id),
+  carId: int("car_id").notNull().references(() => cars.id),
+  salesPersonId: int("sales_person_id").notNull().references(() => users.id),
   orderDate: timestamp("order_date").defaultNow().notNull(),
-  status: text("status").default('pending').$type<"pending" | "confirmed" | "delivered" | "cancelled">(),
+  status: mysqlEnum("status", orderStatusValues).default('pending').notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  notes: text("notes"),
+  notes: varchar("notes", { length: 1000 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Define sales targets table
-export const salesTargets = pgTable("sales_targets", {
-  id: serial("id").primaryKey(),
-  salesPersonId: integer("sales_person_id").notNull().references(() => users.id),
+export const salesTargets = mysqlTable("sales_targets", {
+  id: int("id").primaryKey().autoincrement(),
+  salesPersonId: int("sales_person_id").notNull().references(() => users.id),
   targetMonth: date("target_month").notNull(),
   revenueTarget: decimal("revenue_target", { precision: 10, scale: 2 }).notNull(),
-  unitsTarget: integer("units_target").notNull(),
+  unitsTarget: int("units_target").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
