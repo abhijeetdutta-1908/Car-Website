@@ -2,17 +2,16 @@ import { db } from "@db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { InsertUser, User } from "@shared/schema";
-import connectPg from "connect-pg-simple";
 import session from "express-session";
-import { pool } from "@db/index";
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
+import MySQLStore from "express-mysql-session";
 
 // Create AuthUser type that includes the password field
 const authUserSchema = createSelectSchema(users);
 type AuthUser = z.infer<typeof authUserSchema>;
 
-const PostgresSessionStore = connectPg(session);
+const MySQLSessionStore = MySQLStore(session);
 
 export interface IStorage {
   createUser: (user: InsertUser) => Promise<AuthUser>;
@@ -26,11 +25,25 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      createTableIfMissing: true,
-      tableName: 'session'
-    });
+    // MySQL session store options
+    const sessionStoreOptions = {
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'motoverse',
+      createDatabaseTable: true,
+      schema: {
+        tableName: 'sessions',
+        columnNames: {
+          session_id: 'session_id',
+          expires: 'expires',
+          data: 'data'
+        }
+      }
+    };
+    
+    this.sessionStore = new MySQLSessionStore(sessionStoreOptions);
   }
 
   async createUser(userData: InsertUser): Promise<AuthUser> {

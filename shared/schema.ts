@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, int, timestamp, unique, decimal, date, mysqlEnum } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, int, timestamp, unique, decimal, date, mysqlEnum, text } from "drizzle-orm/mysql-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
@@ -47,7 +47,7 @@ export const customers = mysqlTable("customers", {
   email: varchar("email", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   address: varchar("address", { length: 255 }),
-  notes: varchar("notes", { length: 1000 }),
+  notes: text("notes"),
   salesPersonId: int("sales_person_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -67,7 +67,7 @@ export const cars = mysqlTable("cars", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   vin: varchar("vin", { length: 50 }).notNull(),
   status: mysqlEnum("status", carStatusValues).default('in_stock').notNull(),
-  features: varchar("features", { length: 1000 }),
+  features: text("features"),
   imageUrl: varchar("image_url", { length: 255 }),
   restockDate: date("restock_date"),
   quantity: int("quantity").default(1).notNull(),
@@ -84,7 +84,7 @@ export const orders = mysqlTable("orders", {
   orderDate: timestamp("order_date").defaultNow().notNull(),
   status: mysqlEnum("status", orderStatusValues).default('pending').notNull(),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  notes: varchar("notes", { length: 1000 }),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
